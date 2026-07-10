@@ -1,0 +1,545 @@
+library(shiny)
+library(ggiraph)
+library(shinycustomloader)
+source("R/hitop_circular_viz.R")
+
+item_key  <- read.csv("data/hitopsr_item_key.csv")
+hierarchy <- read.csv("data/hitopsr_hierarchy.csv")
+norms     <- read.csv("data/hitopsr_norms.csv")
+defs_df   <- read.csv("data/hitopsr_definitions.csv")
+scale_defs <- setNames(defs_df$Brief, defs_df$Scale)
+
+
+N_ITEMS <- nrow(item_key)   # 405
+PER_ROW <- 15               # grid cells per row
+
+app_css <- "
+  @import url('https://fonts.googleapis.com/css2?family=Roboto:wght@400;500;700&display=swap');
+  body { font-family: 'Roboto', sans-serif; background: #F7F8FA; color: #1E2430; }
+  .app-header { background: #1E3A5F; color: #fff; padding: 18px 28px;
+                margin: -15px -15px 0 -15px; }
+  .app-header h2 { margin: 0; font-weight: 600; letter-spacing: -0.5px; }
+  .app-header .sub { color: #AECBE8; font-size: 13px; margin-top: 2px; }
+  .brand-bar { margin: 0 -15px 20px -15px; }
+  .brand-bar div { height: 4px; }
+  .brand-light { background: #D8E7F4; }
+  .brand-mid   { background: #98C1E4; }
+  .brand-dark  { background: #69A3D7; }
+  .card { background: #fff; border: 1px solid #E4E7EE; border-radius: 10px;
+          padding: 20px 24px; margin-bottom: 16px; }
+  .progress-pill { display: inline-block; background: #EDF0F6; border-radius: 99px;
+                   padding: 4px 14px; font-size: 13px; color: #3B4356;
+                   font-variant-numeric: tabular-nums; }
+  .btn-primary { background: #1E3A5F; border: none; }
+  .btn-primary:hover { background: #162C49; }
+  #submit_btn { font-weight: 600; padding: 10px 26px; }
+  .anchor-note { font-size: 13px; color: #5A6478; margin-bottom: 12px; }
+  .nav-tabs > li > a { color: #3B4356; font-weight: 500; }
+  a code { color: #3E77B5; text-decoration: underline; }
+
+  /* ---- keyboard grid ---- */
+  #kgrid { display: grid; grid-template-columns: 52px repeat(15, 30px);
+           gap: 4px; align-items: center; }
+  #kgrid .rowlab { color: #8B94A6; font-size: 12px; text-align: right;
+                   padding-right: 6px; font-variant-numeric: tabular-nums; }
+  .kcell { width: 30px; height: 32px; text-align: center; font-size: 15px;
+           font-weight: 600; border: 1px solid #D5DAE4; border-radius: 6px;
+           background: #FBFCFE; caret-color: transparent; padding: 0; }
+  .kcell:focus { outline: 2px solid #3E77B5; outline-offset: -1px;
+                 background: #fff; }
+  .kcell.filled { background: #E7F0F9; border-color: #98C1E4; }
+  .kcell.na-cell { background: #FFF2F0; border-color: #F1C0BA; color: #C0392B; }
+  #item_hint { position: sticky; top: 0; z-index: 5; background: #1E3A5F;
+               color: #fff; border-radius: 8px; padding: 10px 16px;
+               font-size: 14px; margin-bottom: 14px; min-height: 42px; }
+  #item_hint .hint-num { color: #96A0B5; margin-right: 10px;
+                         font-variant-numeric: tabular-nums; }
+  .kgrid-help { font-size: 13px; color: #5A6478; margin-bottom: 10px; }
+  .kgrid-help kbd { background: #EDF0F6; border-radius: 4px; padding: 1px 6px;
+                    border: 1px solid #D5DAE4; font-family: inherit; }
+
+  /* ---- item response view (panel 3) ---- */
+  .irow { display: flex; align-items: center; gap: 12px;
+          padding: 7px 4px; border-bottom: 1px solid #F0F2F6; }
+  .irow .inum { color: #8B94A6; width: 38px; text-align: right;
+                font-variant-numeric: tabular-nums; flex-shrink: 0; }
+  .irow .itext { flex: 1; font-size: 14px; }
+  .irow .irev { color: #8B94A6; font-size: 12px; font-style: italic; }
+  .chip { width: 30px; height: 26px; border-radius: 6px; flex-shrink: 0;
+          display: flex; align-items: center; justify-content: center;
+          font-weight: 600; font-size: 14px; }
+  .chip.c1 { background: #EEF4FB; color: #1E3A5F; }
+  .chip.c2 { background: #D8E7F4; color: #1E3A5F; }
+  .chip.c3 { background: #98C1E4; color: #1E3A5F; }
+  .chip.c4 { background: #3E77B5; color: #fff; }
+  .chip.cna { background: #FFF2F0; color: #C0392B; border: 1px solid #F1C0BA; }
+"
+
+kgrid_js <- sprintf("
+const ITEM_TEXTS = %s;
+const N = %d;
+
+function cellVal(el) { return el.value; }
+
+function updateHint(i) {
+  const hint = document.getElementById('item_hint');
+  if (hint) hint.innerHTML =
+    '<span class=\"hint-num\">Item ' + i + ' / ' + N + '</span>' +
+    ITEM_TEXTS[i - 1];
+}
+
+function pushToShiny() {
+  let s = '';
+  for (let i = 1; i <= N; i++) {
+    const el = document.getElementById('kc' + i);
+    const v = el ? el.value : '';
+    s += (v === '' ? '.' : v);
+  }
+  Shiny.setInputValue('kgrid_vals', s, {priority: 'event'});
+}
+
+function styleCell(el) {
+  el.classList.toggle('filled', /^[1-4]$/.test(el.value));
+  el.classList.toggle('na-cell', el.value === 'x');
+}
+
+function focusCell(i) {
+  const el = document.getElementById('kc' + i);
+  if (el) { el.focus(); el.select(); }
+}
+
+document.addEventListener('keydown', function(e) {
+  const el = e.target;
+  if (!el.classList || !el.classList.contains('kcell')) return;
+  const i = parseInt(el.dataset.i);
+
+  if (/^[1-4]$/.test(e.key)) {
+    el.value = e.key; styleCell(el); pushToShiny();
+    if (i < N) focusCell(i + 1);
+    e.preventDefault();
+  } else if (e.key === 'x' || e.key === 'X' || e.key === '0') {
+    el.value = 'x'; styleCell(el); pushToShiny();      // mark item skipped
+    if (i < N) focusCell(i + 1);
+    e.preventDefault();
+  } else if (e.key === 'Backspace' || e.key === 'Delete') {
+    if (el.value !== '') { el.value = ''; styleCell(el); pushToShiny(); }
+    else if (i > 1 && e.key === 'Backspace') focusCell(i - 1);
+    e.preventDefault();
+  } else if (e.key === 'ArrowRight') { focusCell(i + 1); e.preventDefault(); }
+    else if (e.key === 'ArrowLeft')  { focusCell(i - 1); e.preventDefault(); }
+    else if (e.key === 'ArrowDown')  { focusCell(Math.min(i + %d, N)); e.preventDefault(); }
+    else if (e.key === 'ArrowUp')    { focusCell(Math.max(i - %d, 1)); e.preventDefault(); }
+    else if (e.key.length === 1) e.preventDefault();   // swallow other chars
+});
+
+document.addEventListener('focusin', function(e) {
+  if (e.target.classList && e.target.classList.contains('kcell'))
+    updateHint(parseInt(e.target.dataset.i));
+});
+
+Shiny.addCustomMessageHandler('set_grid', function(vals) {
+  for (let i = 1; i <= N; i++) {
+    const el = document.getElementById('kc' + i);
+    if (!el) continue;
+    const v = vals[i - 1];
+    el.value = (v === null || v === undefined || v === '') ? '' : String(v);
+    styleCell(el);
+  }
+});
+", jsonlite::toJSON(item_key$text), N_ITEMS, PER_ROW, PER_ROW)
+
+# grid cells built server-free (static HTML, fast to render once)
+kgrid_html <- {
+  rows <- split(seq_len(N_ITEMS), ceiling(seq_len(N_ITEMS) / PER_ROW))
+  cells <- lapply(rows, function(ix) {
+    c(list(div(class = "rowlab", sprintf("%d\u2013%d", min(ix), max(ix)))),
+      lapply(ix, function(i)
+        tags$input(id = paste0("kc", i), class = "kcell", `data-i` = i,
+                   type = "text", maxlength = "1", inputmode = "numeric",
+                   autocomplete = "off")))
+  })
+  div(id = "kgrid", do.call(tagList, unlist(cells, recursive = FALSE)))
+}
+
+ui <- fluidPage(
+  tags$head(tags$style(HTML(app_css))),
+  div(class = "app-header",
+      h2("HiTOP-SR Scoring",
+         span("* in pre-alpha developmental phase, feedback is much appreciated",
+              style = paste0("font-size:13px;font-weight:400;color:#AECBE8;",
+                             "margin-left:14px;letter-spacing:0;"))),
+      div(class = "sub",
+          "Hierarchical Taxonomy of Psychopathology \u2014 Self Report (v1.0). ",
+          "All scoring runs locally in your browser; no data is transmitted.")),
+  div(class = "brand-bar",
+      div(class = "brand-light"), div(class = "brand-mid"),
+      div(class = "brand-dark")),
+  
+  tabsetPanel(id = "main_tabs",
+              
+              # ---------------- Data entry ------------------------------------------
+              tabPanel("1 \u00B7 Enter responses", br(),
+                       div(class = "card",
+                           div(class = "anchor-note",
+                               strong("Response scale: "),
+                               "1 = Not at all \u2022 2 = A little \u2022 3 = Moderately \u2022 4 = A lot ",
+                               "(past 12 months)"),
+                           fluidRow(
+                             column(6, radioButtons("entry_mode", NULL, inline = TRUE,
+                                                    choices = c("Keyboard grid" = "grid",
+                                                                "Paste" = "rapid",
+                                                                "Upload CSV" = "upload"))),
+                             column(6, style = "text-align:right;",
+                                    span(class = "progress-pill", textOutput("progress", inline = TRUE)),
+                                    actionButton("load_example", "Load random response for demo",
+                                                 class = "btn btn-default btn-sm",
+                                                 style = "margin-left:10px;"))
+                           )
+                       ),
+                       
+                       conditionalPanel("input.entry_mode == 'grid'",
+                                        div(class = "card",
+                                            div(id = "item_hint",
+                                                span(class = "hint-num", "Item \u2014"),
+                                                "Click any cell to begin; the item text appears here."),
+                                            div(class = "kgrid-help",
+                                                "Type ", tags$kbd("1"), "\u2013", tags$kbd("4"),
+                                                " to score and auto-advance \u00B7 ", tags$kbd("x"),
+                                                " marks an item skipped \u00B7 ", tags$kbd("\u232B"),
+                                                " clears \u00B7 arrow keys move around"),
+                                            kgrid_html
+                                        )
+                       ),
+                       
+                       conditionalPanel("input.entry_mode == 'rapid'",
+                                        div(class = "card",
+                                            p("Type or paste all responses in item order. Digits 1\u20134; use ",
+                                              code("x"), " or ", code("NA"), " for a skipped item. Separators ",
+                                              "(spaces, commas, newlines) are optional."),
+                                            textAreaInput("rapid_text", NULL, rows = 8, width = "100%",
+                                                          placeholder = "e.g.  2 1 1 3 4 1 2 ..."),
+                                            actionButton("apply_rapid", "Apply to responses",
+                                                         class = "btn btn-default"),
+                                            span(style = "margin-left:12px;color:#5A6478;",
+                                                 textOutput("rapid_status", inline = TRUE))
+                                        )
+                       ),
+                       
+                       conditionalPanel("input.entry_mode == 'upload'",
+                                        div(class = "card",
+                                            p("Upload a one-row CSV with columns ", code("hsr001"), "\u2026",
+                                              code("hsr405"), " (or simply 405 values in item order)."),
+                                            fileInput("csv_file", NULL, accept = ".csv")
+                                        )
+                       ),
+                       
+                       div(class = "card", style = "text-align:center;",
+                           actionButton("submit_btn", "Submit",
+                                        class = "btn btn-primary btn-lg"),
+                           div(style = "margin-top:8px;", textOutput("submit_msg"))
+                       )
+              ),
+              
+              # ---------------- Panel 1: circular profile ---------------------------
+              tabPanel("2 \u00B7 Visualization", br(),
+                       div(class = "card",
+                           fluidRow(
+                             column(4, selectInput("norm_group", "Preliminary reference norms",
+                                                   c("Combined" = "pool",
+                                                     "Community (Prolific)"   = "pro",
+                                                     "Students (KU)"          = "ku"))),
+                             column(4, checkboxInput("show_err",
+                                                     "Show measurement error bars (\u00B11 SEM)", TRUE)),
+                             column(4, style = "text-align:right;padding-top:24px;",
+                                    downloadButton("dl_plot", "Download PNG"))
+                           ),
+                           div(class = "anchor-note",
+                               "Hover any bar or label to isolate/gray out bars.")
+                       ),
+                       div(class = "card",
+                           withLoader(girafeOutput("circular_plot", height = "840px"),
+                                      type = "image", loader = "hitop_loader.gif"))
+              ),
+              
+              # ---------------- Panel 3: spectrum drill-down --------------------------
+              tabPanel("3 \u00B7 Spectrum detail", br(),
+                       div(class = "card",
+                           fluidRow(
+                             column(5, selectInput("detail_spectrum", "Spectrum",
+                                                   choices = hitop_spectrum_order)),
+                             column(7, div(class = "anchor-note", style = "padding-top:26px;",
+                                           "Click any bar in the circular bar chart to jump here. ",
+                                           "Hover over scale bar for scale-level T-score and definition.",
+                                           "Click a scale bar to see item/symptom-level responses."))
+                           )
+                       ),
+                       div(class = "card",
+                           withLoader(girafeOutput("detail_plot", height = "auto"),
+                                      type = "image", loader = "hitop_loader.gif")),
+                       div(class = "card", uiOutput("item_panel"))
+              ),
+              tabPanel("About", br(),
+                       div(class = "card",
+                           h4("Notes for interpretation"),
+                           p("Scores are shown as T-scores (mean: 50, SD: 10) relative to ",
+                             "preliminary norms pooled from a Prolific community sample collected ",
+                             "by the Measure Development Workgroup in Phase 2 (n \u2248 780)", 
+                             " and a University of Kansas student sample (n = 411). ",
+                             "Severity bands (minimal < 60, mild 60\u201365, moderate 65\u201370, ",
+                             "severe \u2265 70) are provisional conventions, not validated ",
+                             "clinical cutoffs. Error bars are \u00B11 SEM across the items ",
+                             "within each scale."),
+                           h4("Missing data"),
+                           p("Scale scores are computed from available items (proration / ",
+                             "person-mean imputation) only when at least 75% of a scale's ",
+                             "items are answered; otherwise the scale is not scored and is ",
+                             "marked \u2715 in the charts. Any scale scored from incomplete ",
+                             "items, and any composite built on such scales, is marked * and ",
+                             "should be interpreted with caution: research shows prorated ",
+                             "scores can be biased even when items are missing completely at ",
+                             "random (",
+                             a("Mazza et al., 2015",
+                               href = "https://doi.org/10.1080/00273171.2015.1068157",
+                               target = "_blank"),
+                             "; see also ",
+                             a("Wu et al., 2022",
+                               href = "https://doi.org/10.3758/s13428-021-01671-w",
+                               target = "_blank"),
+                             ", on proration cutoffs). Whenever possible, complete all ",
+                             "items before interpreting the results."),
+                           h4("Attributions"),
+                           p("The HiTOP-SR was developed by the HiTOP Society ",
+                             "(Hierarchical Taxonomy of Psychopathology Society, 2024). ",
+                             "The development of this app was aided by functions in the ",
+                             a(code("hitop"),
+                               href = "https://jmgirard.github.io/hitop/",
+                               target = "_blank"),
+                             " package developed by Jeffrey Girard. This web app is in ",
+                             "development by the HiTOP Software and Web Development Workgroup, ",
+                             "and is a tool for research and clinical-adjunct use. It is NOT ",
+                             "a diagnostic instrument.")))
+  ),
+  
+  # JS goes last so item texts are available
+  tags$script(HTML(kgrid_js))
+)
+
+server <- function(input, output, session) {
+  
+  responses <- reactiveVal(rep(NA_real_, N_ITEMS))
+  submitted <- reactiveVal(NULL)        # bar data (raw units)
+  submitted_items <- reactiveVal(NULL)  # raw item vector at submit time
+  sel_spectrum <- reactiveVal(hitop_spectrum_order[1])
+  sel_scale    <- reactiveVal(NULL)
+  
+  output$progress <- renderText({
+    sprintf("%d / %d entered", sum(!is.na(responses())), N_ITEMS)
+  })
+  
+  sync_grid <- function(r) {
+    vals <- ifelse(is.na(r), "", as.character(r))
+    session$sendCustomMessage("set_grid", as.list(vals))
+  }
+  
+  # ---- keyboard grid -> R -------------------------------------------------
+  observeEvent(input$kgrid_vals, {
+    ch <- strsplit(input$kgrid_vals, "")[[1]]
+    if (length(ch) != N_ITEMS) return()
+    r <- suppressWarnings(as.numeric(ch))   # '.', 'x' -> NA
+    responses(r)
+  })
+  
+  # ---- random demo responses ----------------------------------------------
+  observeEvent(input$load_example, {
+    r <- sample(1:4, N_ITEMS, replace = TRUE)
+    responses(r)
+    sync_grid(r)
+    showNotification("Random demo responses loaded.", type = "message")
+  })
+  
+  # ---- paste --------------------------------------------------------------
+  observeEvent(input$apply_rapid, {
+    toks <- regmatches(input$rapid_text,
+                       gregexpr("[1-4]|NA|na|x|X", input$rapid_text))[[1]]
+    vals <- suppressWarnings(as.numeric(toks))
+    if (length(vals) == 0) {
+      output$rapid_status <- renderText("No responses found."); return()
+    }
+    if (length(vals) > N_ITEMS) vals <- vals[1:N_ITEMS]
+    r <- responses(); r[seq_along(vals)] <- vals
+    responses(r); sync_grid(r)
+    output$rapid_status <- renderText(
+      sprintf("Parsed %d responses (%d missing).",
+              length(vals), sum(is.na(vals))))
+  })
+  
+  # ---- csv upload ---------------------------------------------------------
+  observeEvent(input$csv_file, {
+    df <- try(read.csv(input$csv_file$datapath), silent = TRUE)
+    if (inherits(df, "try-error") || nrow(df) < 1) {
+      showNotification("Could not read that CSV.", type = "error"); return()
+    }
+    hsr_cols <- grep("^hsr\\d{3}$", names(df), value = TRUE)
+    vals <- if (length(hsr_cols) == N_ITEMS) {
+      as.numeric(df[1, paste0("hsr", sprintf("%03d", 1:N_ITEMS))])
+    } else {
+      suppressWarnings(as.numeric(df[1, ]))[1:N_ITEMS]
+    }
+    vals[!(vals %in% 1:4)] <- NA
+    responses(vals); sync_grid(vals)
+    showNotification(sprintf("Loaded %d responses from CSV.",
+                             sum(!is.na(vals))), type = "message")
+  })
+  
+  # ---- submit -------------------------------------------------------------
+  observeEvent(input$submit_btn, {
+    r <- responses()
+    n_miss <- sum(is.na(r))
+    if (n_miss == N_ITEMS) {
+      output$submit_msg <- renderText("No responses entered yet."); return()
+    }
+    bars <- build_individual_bars(r, item_key, hierarchy)
+    submitted(bars); submitted_items(r)
+    
+    sup <- bars$name[bars$level == "scale" & bars$flag == "suppressed"]
+    pro <- bars$name[bars$level == "scale" & bars$flag == "prorated"]
+    pct <- 100 * n_miss / N_ITEMS
+    
+    output$submit_msg <- renderText(
+      if (n_miss == 0) "Results calculated with complete data."
+      else sprintf(
+        "Results calculated with %d missing item(s) (%.1f%%): %d scale(s) prorated*, %d not scored.",
+        n_miss, pct, length(pro), length(sup)))
+    
+    if (pct > 10 || length(sup) > 0) {
+      showModal(modalDialog(
+        title = "Missing-data warning",
+        tags$p(sprintf(
+          "%d of %d items (%.1f%%) are unanswered.", n_miss, N_ITEMS, pct)),
+        if (length(sup) > 0) tagList(
+          tags$p(tags$b(sprintf(
+            "%d scale(s) were NOT scored (more than 25%% of their items missing):",
+            length(sup))), style = "margin-bottom:4px;"),
+          tags$p(paste(sup, collapse = ", "),
+                 style = "color:#8A1F1F;")),
+        if (length(pro) > 0) tags$p(sprintf(
+          "%d scale(s) are prorated from available items (marked * in charts); prorated scores can be biased even when items are missing at random, so interpret them with caution.",
+          length(pro))),
+        tags$p("Composites built on incomplete scales are also marked *. ",
+               "If possible, return to the entry tab and fill in the ",
+               "missing items before interpreting the results."),
+        easyClose = TRUE, footer = modalButton("Understood")))
+    }
+    updateTabsetPanel(session, "main_tabs", selected = "2 \u00B7 Visualization")
+  })
+  
+  # ---- shared T-scored bars ----------------------------------------------
+  norm_cols <- reactive(switch(input$norm_group,
+                               pool = c(mean = "mean_pool", sd = "sd_pool"),
+                               pro  = c(mean = "mean_pro",  sd = "sd_pool"),
+                               ku   = c(mean = "mean_ku",   sd = "sd_pool")))
+  
+  bars_t <- reactive({
+    req(submitted())
+    bars <- apply_norms(submitted(), norms, norm_cols())
+    if (!isTRUE(input$show_err)) bars$lo <- bars$hi <- NA_real_
+    bars
+  })
+  
+  profile_plot <- reactive(plot_hitop_circular(bars_t(), defs = scale_defs))
+  
+  output$circular_plot <- renderGirafe(hitop_girafe(profile_plot()))
+  
+  output$dl_plot <- downloadHandler(
+    filename = function() sprintf("hitop_profile_%s.png", Sys.Date()),
+    content = function(file)
+      ggsave(file, profile_plot(), width = 11, height = 11,
+             dpi = 200, bg = "white"))
+  
+  # ---- click routing: circular profile -> panel 3 --------------------------
+  observeEvent(input$circular_plot_selected, {
+    nm <- input$circular_plot_selected
+    req(nm)
+    if (nm %in% hierarchy$Spectrum) {
+      sel_spectrum(nm); sel_scale(NULL)
+    } else if (nm %in% hierarchy$Subfactor) {
+      sel_spectrum(hierarchy$Spectrum[match(nm, hierarchy$Subfactor)])
+      sel_scale(NULL)
+    } else if (nm %in% hierarchy$Scale) {
+      sel_spectrum(hierarchy$Spectrum[match(nm, hierarchy$Scale)])
+      sel_scale(nm)
+    } else return()
+    updateSelectInput(session, "detail_spectrum", selected = sel_spectrum())
+    updateTabsetPanel(session, "main_tabs",
+                      selected = "3 \u00B7 Spectrum detail")
+  })
+  
+  observeEvent(input$detail_spectrum, {
+    if (!identical(input$detail_spectrum, sel_spectrum())) {
+      sel_spectrum(input$detail_spectrum); sel_scale(NULL)
+    }
+  })
+  
+  # ---- panel 3: spectrum detail chart --------------------------------------
+  observeEvent(input$detail_plot_selected, {
+    nm <- input$detail_plot_selected
+    req(nm)
+    if (nm %in% hierarchy$Scale) sel_scale(nm)
+    else showNotification("Click a scale bar to see its items.",
+                          type = "message")
+  })
+  
+  output$detail_plot <- renderGirafe({
+    req(bars_t())
+    d <- bars_t()[bars_t()$spectrum == sel_spectrum(), ]
+    h <- max(2, 0.30 * nrow(d) + 1)
+    hitop_girafe(plot_spectrum_detail(bars_t(), sel_spectrum(),
+                                      defs = scale_defs),
+                 w = 9.5, h = h)
+  })
+  
+  # ---- panel 3: item responses for a clicked scale --------------------------
+  output$item_panel <- renderUI({
+    if (is.null(submitted_items()))
+      return(p(class = "anchor-note", "Submit responses first."))
+    if (is.null(sel_scale()))
+      return(p(class = "anchor-note",
+               "Click a scale bar above to see the item responses."))
+    
+    sc  <- sel_scale()
+    cam <- hierarchy$camel[match(sc, hierarchy$Scale)]
+    ki  <- item_key[item_key$camel == cam, ]
+    r   <- submitted_items()[ki$item]
+    scored <- ifelse(ki$reverse, 5 - r, r)
+    ord <- order(-ifelse(is.na(scored), -1, scored), ki$item)
+    
+    tb <- bars_t()
+    trow <- tb[tb$level == "scale" & tb$name == sc, ]
+    
+    rows <- lapply(ord, function(j) {
+      v <- r[j]
+      chip <- if (is.na(v))
+        span(class = "chip cna", "\u00D7")
+      else
+        span(class = paste0("chip c", v), v)
+      div(class = "irow",
+          span(class = "inum", ki$item[j]),
+          span(class = "itext", ki$text[j],
+               if (ki$reverse[j])
+                 span(class = "irev",
+                      sprintf(" (reverse-scored; counts as %s)",
+                              ifelse(is.na(v), "\u2014", 5 - v)))),
+          chip)
+    })
+    
+    tagList(
+      h4(sprintf("%s \u2014 item responses", sc)),
+      div(class = "anchor-note", sprintf(
+        "%d items \u00B7 1 = Not at all, 2 = A little, 3 = Moderately, 4 = A lot (past 12 months) \u00B7 T = %.1f (%s) \u00B7 sorted by response, highest first",
+        nrow(ki), trow$mean, hitop_severity_label(trow$mean))),
+      rows
+    )
+  })
+}
+
+shinyApp(ui, server)
