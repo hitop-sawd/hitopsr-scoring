@@ -1,18 +1,3 @@
-# =============================================================================
-# HiTOP-SR Circular Bar Chart — norm-referenced T-scores with severity rings
-# -----------------------------------------------------------------------------
-# Pipeline for the Shiny app:
-#   1. Score 76 scales from raw items (hitop::score_hitopsr or inline scoring)
-#   2. build_hitop_levels()  -> per-person scores at scale/subfactor/spectrum
-#   3. summarize_hitop()     -> one row per bar (mean + error bounds, raw units)
-#   4. apply_norms()         -> convert to T-scores using hitopsr_norms.csv
-#   5. plot_hitop_circular() -> circular chart; severity rings at T=60/65/70
-#
-# Severity convention (standard for symptom inventories):
-#   minimal T<60 | mild 60-65 | moderate 65-70 | severe T>=70
-# Requires: dplyr, tidyr, ggplot2, colorspace
-# =============================================================================
-
 library(dplyr)
 library(tidyr)
 library(ggplot2)
@@ -384,10 +369,16 @@ hitop_girafe <- function(p, w = 10.5, h = 10.5,
   girafe(
     ggobj = p, width_svg = w, height_svg = h,
     options = list(
-      opts_hover(css = "stroke:#1E3A5F;stroke-width:0.8px;"),
+      opts_hover(css = girafe_css(
+        css  = "stroke:#1E3A5F;stroke-width:0.8px;",
+        text = "stroke:none;font-weight:700;"
+      )),
       opts_hover_inv(css = "opacity:0.15;filter:grayscale(85%);"),
       opts_selection(type = selection,
-                     css = "stroke:#1E3A5F;stroke-width:1.2px;"),
+                     css = girafe_css(
+                       css  = "stroke:#1E3A5F;stroke-width:1.2px;",
+                       text = "stroke:none;"
+                     )),
       opts_tooltip(css = paste0(
         "background:#1E3A5F;color:#fff;padding:8px 12px;",
         "border-radius:6px;font-family:Roboto,sans-serif;font-size:13px;",

@@ -14,11 +14,12 @@ N_ITEMS <- nrow(item_key)   # 405
 PER_ROW <- 15               # grid cells per row
 
 app_css <- "
-  @import url('https://fonts.googleapis.com/css2?family=Roboto:wght@400;500;700&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=Roboto:wght@400;500;700&family=Nunito+Sans:wght@600;700&display=swap');
   body { font-family: 'Roboto', sans-serif; background: #F7F8FA; color: #1E2430; }
   .app-header { background: #1E3A5F; color: #fff; padding: 18px 28px;
                 margin: -15px -15px 0 -15px; }
   .app-header h2 { margin: 0; font-weight: 600; letter-spacing: -0.5px; }
+  .app-header h2 { font-family: 'Avenir Next', 'Avenir', 'Nunito Sans', 'Roboto', sans-serif; }
   .app-header .sub { color: #AECBE8; font-size: 13px; margin-top: 2px; }
   .brand-bar { margin: 0 -15px 20px -15px; }
   .brand-bar div { height: 4px; }
@@ -254,7 +255,7 @@ ui <- fluidPage(
                                     downloadButton("dl_plot", "Download PNG"))
                            ),
                            div(class = "anchor-note",
-                               "Hover any bar or label to isolate/gray out bars.")
+                               "Hover over any bar or label to isolate/gray out bars.")
                        ),
                        div(class = "card",
                            withLoader(girafeOutput("circular_plot", height = "840px"),
