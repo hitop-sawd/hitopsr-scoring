@@ -1,3 +1,18 @@
+# =============================================================================
+# HiTOP-SR Circular Bar Chart — norm-referenced T-scores with severity rings
+# -----------------------------------------------------------------------------
+# Pipeline for the Shiny app:
+#   1. Score 76 scales from raw items (hitop::score_hitopsr or inline scoring)
+#   2. build_hitop_levels()  -> per-person scores at scale/subfactor/spectrum
+#   3. summarize_hitop()     -> one row per bar (mean + error bounds, raw units)
+#   4. apply_norms()         -> convert to T-scores using hitopsr_norms.csv
+#   5. plot_hitop_circular() -> circular chart; severity rings at T=60/65/70
+#
+# Severity convention (standard for symptom inventories):
+#   minimal T<60 | mild 60-65 | moderate 65-70 | severe T>=70
+# Requires: dplyr, tidyr, ggplot2, colorspace
+# =============================================================================
+
 library(dplyr)
 library(tidyr)
 library(ggplot2)
