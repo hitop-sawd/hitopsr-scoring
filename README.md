@@ -10,5 +10,5 @@
 
 This web app is **IN DEVELOPMENT**! Any and all feedback and contributions are welcome and much appreciated. 
  
-Please send an email to carolinelee@smu.edu, [create a pull request] (https://github.com/hitop-sawd/hitopsr-scoring/pulls), or [open an issue](https://github.com/hitop-sawd/hitopsr-scoring/issues).  
+Please send an email to carolinelee@smu.edu, [create a pull request](https://github.com/hitop-sawd/hitopsr-scoring/pulls), or [open an issue](https://github.com/hitop-sawd/hitopsr-scoring/issues).  
  
