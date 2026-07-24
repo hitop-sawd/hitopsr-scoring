@@ -8,7 +8,7 @@
   if (isReducedMotion) return;
 
   const nekoEl = document.createElement("div");
-  let persistPosition = true;
+  let persistPosition = false;
 
   let nekoPosX = 32;
   let nekoPosY = 32;
@@ -119,15 +119,37 @@
     nekoEl.style.width = "32px";
     nekoEl.style.height = "32px";
     nekoEl.style.position = "fixed";
-    nekoEl.style.pointerEvents = "none";
+    nekoEl.style.pointerEvents = "auto";
+    nekoEl.style.cursor = "pointer";
+    nekoEl.title = "oneko";
     nekoEl.style.imageRendering = "pixelated";
     nekoEl.style.left = `${nekoPosX - 16}px`;
     nekoEl.style.top = `${nekoPosY - 16}px`;
-    nekoEl.style.zIndex = 2147483647;
+    nekoEl.style.zIndex = 800;
 
     nekoEl.style.backgroundImage = `url(${nekoFile})`;
     
     document.body.appendChild(nekoEl);
+
+    nekoEl.addEventListener("click", function (e) {
+      e.stopPropagation();
+      parked = !parked;
+      resetIdleAnimation();
+      idleTime = 0;
+      if (parked) parkPosition();
+    });
+    window.addEventListener("resize", function () {
+      if (parked) parkPosition();
+    });
+    parkPosition();
+    setSprite("sleeping", 0);
+    syncTabVisibility();
+
+    // only appear on the About tab; nap + hide everywhere else
+    if (window.jQuery) {
+      window.jQuery(document).on("shown.bs.tab", 'a[data-toggle="tab"]',
+        function () { syncTabVisibility(); });
+    }
 
     document.addEventListener("mousemove", function (event) {
       mousePosX = event.clientX;
@@ -238,6 +260,12 @@
 
   function frame() {
     frameCount += 1;
+    if (parked) {
+      parkPosition();
+      if (frameCount % 1000 < 8) setSprite("tired", 0);
+      else setSprite("sleeping", Math.floor(frameCount / 4));
+      return;
+    }
     const diffX = nekoPosX - mousePosX;
     const diffY = nekoPosY - mousePosY;
     const distance = Math.sqrt(diffX ** 2 + diffY ** 2);
@@ -275,19 +303,37 @@
     nekoEl.style.top = `${nekoPosY - 16}px`;
   }
 
-  // --- toggle adaptation for HiTOP-SR Scoring app -------------------------
-  // Cat is created on first toggle (not on page load) and hidden/shown after.
-  let onekoRunning = false;
-  let onekoStarted = false;
+  // --- HiTOP adaptation: cat sleeps in the bottom-right corner ------------
+  // It naps there until clicked; clicking wakes it to chase the cursor, and
+  // clicking it again sends it back to its corner.
+  let parked = true;
+
+  function parkPosition() {
+    nekoPosX = window.innerWidth - 28;
+    nekoPosY = window.innerHeight - 22;
+    nekoEl.style.left = `${nekoPosX - 16}px`;
+    nekoEl.style.top = `${nekoPosY - 16}px`;
+  }
+
+  function onAboutTab() {
+    var active = document.querySelector("#main_tabs li.active a");
+    return !!active && active.getAttribute("data-value") === "About";
+  }
+
+  function syncTabVisibility() {
+    var show = onAboutTab();
+    nekoEl.style.display = show ? "" : "none";
+    var credit = document.getElementById("oneko-credit");
+    if (credit) credit.style.display = show ? "inline-block" : "none";
+    if (!show && !parked) { parked = true; parkPosition(); }
+  }
+
+  // kept for compatibility / console fun
   window.toggleOneko = function () {
-    if (!onekoRunning) {
-      if (!onekoStarted) { init(); onekoStarted = true; }
-      else nekoEl.style.display = "";
-      onekoRunning = true;
-    } else {
-      nekoEl.style.display = "none";
-      onekoRunning = false;
-    }
-    return onekoRunning;
+    parked = !parked;
+    if (parked) parkPosition();
+    return !parked;
   };
+
+  init();
 })();

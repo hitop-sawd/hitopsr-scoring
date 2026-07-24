@@ -1,18 +1,3 @@
-# =============================================================================
-# HiTOP-SR Circular Bar Chart — norm-referenced T-scores with severity rings
-# -----------------------------------------------------------------------------
-# Pipeline for the Shiny app:
-#   1. Score 76 scales from raw items (hitop::score_hitopsr or inline scoring)
-#   2. build_hitop_levels()  -> per-person scores at scale/subfactor/spectrum
-#   3. summarize_hitop()     -> one row per bar (mean + error bounds, raw units)
-#   4. apply_norms()         -> convert to T-scores using hitopsr_norms.csv
-#   5. plot_hitop_circular() -> circular chart; severity rings at T=60/65/70
-#
-# Severity convention (standard for symptom inventories):
-#   minimal T<60 | mild 60-65 | moderate 65-70 | severe T>=70
-# Requires: dplyr, tidyr, ggplot2, colorspace
-# =============================================================================
-
 library(dplyr)
 library(tidyr)
 library(ggplot2)
@@ -25,18 +10,18 @@ tip_def <- function(name, defs) {
   d <- defs[name]
   ifelse(is.na(d), "",
          vapply(d, function(x) paste0("\n\n", paste(strwrap(x, 46),
-                collapse = "\n")), character(1)))
+                                                    collapse = "\n")), character(1)))
 }
 
 tip_missing <- function(flag, n_answered, n_total) {
   ifelse(flag == "suppressed",
          sprintf("\nNOT SCORED \u2014 more than 25%% of items missing (%d/%d answered)",
                  n_answered, n_total),
-  ifelse(flag == "prorated",
-         sprintf("\nprorated from %d/%d items \u2014 interpret with caution",
-                 n_answered, n_total),
-  ifelse(flag == "partial",
-         "\nincludes incomplete scales \u2014 interpret with caution", "")))
+         ifelse(flag == "prorated",
+                sprintf("\nprorated from %d/%d items \u2014 interpret with caution",
+                        n_answered, n_total),
+                ifelse(flag == "partial",
+                       "\nincludes incomplete scales \u2014 interpret with caution", "")))
 }
 
 hitop_severity_label <- function(t) {
@@ -78,7 +63,7 @@ build_hitop_levels <- function(scale_scores, hierarchy, prefix = "hsr_") {
       paste(p, collapse = "")
     }, character(1))
   }
-
+  
   hierarchy <- hierarchy |>
     mutate(col = paste0(prefix, to_camel(Scale)),
            Subfactor = ifelse(is.na(Subfactor) | Subfactor == "NA",
@@ -86,13 +71,13 @@ build_hitop_levels <- function(scale_scores, hierarchy, prefix = "hsr_") {
   missing <- setdiff(hierarchy$col, names(scale_scores))
   if (length(missing) > 0)
     stop("Scale columns not found: ", paste(missing, collapse = ", "))
-
+  
   scores <- scale_scores |>
     mutate(.pid = row_number()) |>
     select(.pid, all_of(hierarchy$col)) |>
     pivot_longer(-".pid", names_to = "col", values_to = "score") |>
     left_join(hierarchy, by = "col")
-
+  
   bind_rows(
     scores |>
       summarise(score = mean(score, na.rm = TRUE), .by = c(.pid, Spectrum)) |>
@@ -116,7 +101,7 @@ summarize_hitop <- function(long_scores,
   error <- match.arg(error)
   if (dplyr::n_distinct(long_scores$.pid) < 2 && error != "none")
     error <- "none"
-
+  
   long_scores |>
     summarise(mean = mean(score, na.rm = TRUE),
               sd = sd(score, na.rm = TRUE),
@@ -160,9 +145,9 @@ plot_hitop_circular <- function(bar_data,
                                 score_range = c(1, 4),
                                 gap = 2,
                                 base_size = 11) {
-
+  
   lvl_rank <- c(spectrum = 1, subfactor = 2, scale = 3)
-
+  
   df <- bar_data |>
     mutate(spectrum = factor(spectrum, levels = hitop_spectrum_order),
            lvl_rank = lvl_rank[level]) |>
@@ -170,19 +155,19 @@ plot_hitop_circular <- function(bar_data,
             !is.na(subfactor) | level != "spectrum",
             subfactor, lvl_rank, name) |>
     group_by(spectrum) |> mutate(.within = row_number()) |> ungroup()
-
+  
   spec_sizes <- df |> count(spectrum, name = "n_bars") |>
     mutate(offset = cumsum(dplyr::lag(n_bars + gap, default = 0)))
   df <- df |>
     left_join(spec_sizes |> select(spectrum, offset), by = "spectrum") |>
     mutate(x = .within + offset)
   total_slots <- max(df$x) + gap
-
+  
   df <- df |>
     mutate(fill = colorspace::darken(
       hitop_spectrum_colors[as.character(spectrum)],
       hitop_level_darken[level]))
-
+  
   # radial scale setup
   if (tscore) {
     floor_y <- t_floor
@@ -202,7 +187,7 @@ plot_hitop_circular <- function(bar_data,
   }
   label_r <- axis_top + (axis_top - floor_y) * 0.03
   hollow  <- floor_y - (axis_top - floor_y) * 0.75
-
+  
   df <- df |>
     mutate(deg   = 90 - 360 * (x - 0.5) / total_slots,
            hjust = ifelse(deg < -90, 1, 0),
@@ -217,20 +202,20 @@ plot_hitop_circular <- function(bar_data,
            n_total = if ("n_total" %in% names(bar_data)) n_total else NA,
            tip = paste0(
              ifelse(is.na(mean), name,
-               if (tscore) {
-                 sprintf("%s\nT = %.1f (%s)\n%s level",
-                         name, mean, hitop_severity_label(mean), level)
-               } else {
-                 sprintf("%s\nscore = %.2f\n%s level", name, mean, level)
-               }),
+                    if (tscore) {
+                      sprintf("%s\nT = %.1f (%s)\n%s level",
+                              name, mean, hitop_severity_label(mean), level)
+                    } else {
+                      sprintf("%s\nscore = %.2f\n%s level", name, mean, level)
+                    }),
              tip_missing(flag, n_answered, n_total),
              tip_def(name, defs)),
            lab = ifelse(flag == "prorated" | flag == "partial",
                         paste0(lab, "*"), lab),
            labcol = ifelse(flag == "suppressed", "grey60", fill))
-
+  
   p <- ggplot(df)
-
+  
   # severity band annuli (T-score mode only), gray shades + top-right legend
   if (tscore) {
     bands <- hitop_severity_bands |>
@@ -252,8 +237,8 @@ plot_hitop_circular <- function(bar_data,
       geom_hline(yintercept = c(60, 65, 70),
                  color = "grey55", linewidth = 0.25, linetype = "31")
   }
-  show_tag <- tscore && any(df$flag %in% c("prorated", "partial"))
-
+  show_tag <- any(df$flag %in% c("prorated", "partial"))
+  
   out <- p +
     geom_hline(yintercept = ring_breaks, color = "grey85", linewidth = 0.3) +
     geom_rect_interactive(
@@ -267,6 +252,9 @@ plot_hitop_circular <- function(bar_data,
       aes(x = x, y = floor_y + (axis_top - floor_y) * 0.04,
           data_id = name, tooltip = tip),
       shape = 4, size = 1.4, stroke = 0.7, color = "grey55") +
+    geom_errorbar(aes(x = x, ymin = lo_c, ymax = hi_c),
+                  width = 0.38, linewidth = 0.9, color = "white",
+                  na.rm = TRUE) +
     geom_errorbar(aes(x = x, ymin = lo_c, ymax = hi_c),
                   width = 0.35, linewidth = 0.3, color = "grey15",
                   na.rm = TRUE) +
@@ -297,7 +285,7 @@ plot_hitop_circular <- function(bar_data,
                                      color = "grey25"),
           legend.key.size = unit(base_size * 1.1, "pt"),
           legend.key = element_rect(color = "grey75", linewidth = 0.3))
-
+  
   if (show_tag) {
     out <- out +
       labs(tag = "* included one or more missing responses") +
@@ -325,7 +313,7 @@ build_individual_bars <- function(resp, key, hierarchy, ci = 1,
   stopifnot(length(resp) == nrow(key))
   r <- as.numeric(resp)
   r[key$reverse] <- 5 - r[key$reverse]
-
+  
   per_scale <- lapply(split(r, key$camel), function(x) {
     n_tot <- length(x); x <- x[!is.na(x)]
     c(mean = if (length(x) / n_tot >= 1 - max_missing) mean(x) else NA,
@@ -337,37 +325,37 @@ build_individual_bars <- function(resp, key, hierarchy, ci = 1,
   sc <- merge(hierarchy, sc, by = "camel")
   sc$Subfactor[sc$Subfactor == "NA" | sc$Subfactor == ""] <- NA
   sc$flag <- ifelse(is.na(sc$mean), "suppressed",
-             ifelse(sc$n_answered < sc$n_total, "prorated", "ok"))
-
+                    ifelse(sc$n_answered < sc$n_total, "prorated", "ok"))
+  
   scale_bars <- data.frame(
     level = "scale", name = sc$Scale, spectrum = sc$Spectrum,
     subfactor = sc$Subfactor, mean = sc$mean,
     lo = sc$mean - ci * sc$sem, hi = sc$mean + ci * sc$sem,
     n_answered = sc$n_answered, n_total = sc$n_total, flag = sc$flag
   )
-
+  
   comp <- function(df, level, name, spectrum, subfactor) {
     ok <- !is.na(df$mean)
     m <- if (any(ok)) mean(df$mean[ok]) else NA
     sem <- if (sum(ok) > 1) sd(df$mean[ok]) / sqrt(sum(ok)) else NA
     flag <- if (!any(ok)) "suppressed"
-            else if (any(df$flag != "ok")) "partial" else "ok"
+    else if (any(df$flag != "ok")) "partial" else "ok"
     data.frame(level = level, name = name, spectrum = spectrum,
                subfactor = subfactor, mean = m,
                lo = m - ci * sem, hi = m + ci * sem,
                n_answered = sum(df$n_answered),
                n_total = sum(df$n_total), flag = flag)
   }
-
+  
   subf_bars <- do.call(rbind, lapply(
     split(sc[!is.na(sc$Subfactor), ],
           paste(sc$Spectrum, sc$Subfactor)[!is.na(sc$Subfactor)]),
     function(d) comp(d, "subfactor", d$Subfactor[1], d$Spectrum[1],
                      d$Subfactor[1])))
-
+  
   spec_bars <- do.call(rbind, lapply(split(sc, sc$Spectrum), function(d)
     comp(d, "spectrum", d$Spectrum[1], d$Spectrum[1], NA_character_)))
-
+  
   out <- rbind(spec_bars, subf_bars, scale_bars)
   rownames(out) <- NULL
   out
@@ -384,16 +372,10 @@ hitop_girafe <- function(p, w = 10.5, h = 10.5,
   girafe(
     ggobj = p, width_svg = w, height_svg = h,
     options = list(
-      opts_hover(css = girafe_css(
-        css  = "stroke:#1E3A5F;stroke-width:0.8px;",
-        text = "stroke:none;font-weight:700;"
-      )),
+      opts_hover(css = "stroke:#1E3A5F;stroke-width:0.8px;"),
       opts_hover_inv(css = "opacity:0.15;filter:grayscale(85%);"),
       opts_selection(type = selection,
-                     css = girafe_css(
-                       css  = "stroke:#1E3A5F;stroke-width:1.2px;",
-                       text = "stroke:none;"
-                     )),
+                     css = "stroke:#1E3A5F;stroke-width:1.2px;"),
       opts_tooltip(css = paste0(
         "background:#1E3A5F;color:#fff;padding:8px 12px;",
         "border-radius:6px;font-family:Roboto,sans-serif;font-size:13px;",
@@ -410,11 +392,18 @@ hitop_girafe <- function(p, w = 10.5, h = 10.5,
 #' scale bar reports its name back to Shiny for the item-level view.
 plot_spectrum_detail <- function(bars_t, spectrum_name,
                                  defs = NULL,
+                                 tscore = TRUE,
                                  t_floor = 30, t_ceil = 85,
+                                 score_range = c(1, 4),
                                  base_size = 12) {
   lvl_rank <- c(spectrum = 1, subfactor = 2, scale = 3)
   base_col <- hitop_spectrum_colors[[spectrum_name]]
-
+  
+  floor_y <- if (tscore) t_floor else score_range[1]
+  ceil_y  <- if (tscore) t_ceil  else score_range[2]
+  span    <- ceil_y - floor_y
+  breaks  <- if (tscore) seq(40, 80, 10) else seq(score_range[1], score_range[2], 1)
+  
   d <- bars_t |>
     filter(spectrum == spectrum_name) |>
     mutate(lvl_rank = lvl_rank[level]) |>
@@ -429,60 +418,197 @@ plot_spectrum_detail <- function(bars_t, spectrum_name,
       face  = case_when(level == "spectrum"  ~ "bold",
                         level == "subfactor" ~ "bold.italic",
                         TRUE ~ "plain"),
-      mean_c = pmin(pmax(mean, t_floor), t_ceil),
-      lo_c   = pmin(pmax(lo, t_floor), t_ceil),
-      hi_c   = pmin(pmax(hi, t_floor), t_ceil),
-      capped = mean > t_ceil,
+      mean_c = pmin(pmax(mean, floor_y), ceil_y),
+      lo_c   = pmin(pmax(lo, floor_y), ceil_y),
+      hi_c   = pmin(pmax(hi, floor_y), ceil_y),
+      capped = mean > ceil_y,
       flag = if ("flag" %in% names(bars_t)) flag else "ok",
       n_answered = if ("n_answered" %in% names(bars_t)) n_answered else NA,
       n_total = if ("n_total" %in% names(bars_t)) n_total else NA,
       tip = paste0(
         ifelse(is.na(mean), name,
-          sprintf("%s\nT = %.1f (%s)\n%s level%s",
-                  name, mean, hitop_severity_label(mean), level,
-                  ifelse(level == "scale", "\nclick for item responses", ""))),
+               if (tscore) {
+                 sprintf("%s\nT = %.1f (%s)\n%s level%s",
+                         name, mean, hitop_severity_label(mean), level,
+                         ifelse(level == "scale", "\nclick for item responses", ""))
+               } else {
+                 sprintf("%s\nscore = %.2f (1\u20134 scale)\n%s level%s",
+                         name, mean, level,
+                         ifelse(level == "scale", "\nclick for item responses", ""))
+               }),
         tip_missing(flag, n_answered, n_total),
         tip_def(name, defs)),
       lab = ifelse(flag == "prorated" | flag == "partial",
                    paste0(lab, "*"), lab),
       labcol = ifelse(flag == "suppressed", "grey60", fill)
     )
-
-  bands <- hitop_severity_bands
-  bands$lo <- pmax(bands$lo, t_floor); bands$hi <- pmin(bands$hi, t_ceil)
-
-  ggplot(d) +
-    geom_rect(data = bands,
-              aes(xmin = lo, xmax = hi,
-                  ymin = 0.4, ymax = nrow(d) + 0.6, alpha = band),
-              fill = "grey10", show.legend = FALSE) +
-    scale_alpha_manual(values = setNames(bands$alpha, bands$band)) +
-    geom_vline(xintercept = c(60, 65, 70), color = "grey55",
-               linewidth = 0.25, linetype = "31") +
+  
+  p <- ggplot(d)
+  
+  if (tscore) {
+    bands <- hitop_severity_bands
+    bands$lo <- pmax(bands$lo, floor_y); bands$hi <- pmin(bands$hi, ceil_y)
+    p <- p +
+      geom_rect(data = bands,
+                aes(xmin = lo, xmax = hi,
+                    ymin = 0.4, ymax = nrow(d) + 0.6, alpha = band),
+                fill = "grey10", show.legend = FALSE) +
+      scale_alpha_manual(values = setNames(bands$alpha, bands$band)) +
+      geom_vline(xintercept = c(60, 65, 70), color = "grey55",
+                 linewidth = 0.25, linetype = "31")
+  } else {
+    p <- p +
+      geom_vline(xintercept = breaks, color = "grey88", linewidth = 0.3)
+  }
+  
+  p +
     geom_rect_interactive(
       data = d |> filter(!is.na(mean)),
-      aes(xmin = t_floor, xmax = mean_c,
+      aes(xmin = floor_y, xmax = mean_c,
           ymin = ypos - 0.36, ymax = ypos + 0.36,
           fill = fill, data_id = name, tooltip = tip),
       show.legend = FALSE) +
     geom_point_interactive(
       data = d |> filter(is.na(mean)),
-      aes(x = t_floor + 1.5, y = ypos, data_id = name, tooltip = tip),
+      aes(x = floor_y + span * 0.027, y = ypos,
+          data_id = name, tooltip = tip),
       shape = 4, size = 1.8, stroke = 0.8, color = "grey55") +
+    geom_errorbarh(aes(xmin = lo_c, xmax = hi_c, y = ypos),
+                   height = 0.28, linewidth = 0.9, color = "white",
+                   na.rm = TRUE) +
     geom_errorbarh(aes(xmin = lo_c, xmax = hi_c, y = ypos),
                    height = 0.25, linewidth = 0.3, color = "grey15",
                    na.rm = TRUE) +
     geom_point(data = d |> filter(capped),
-               aes(x = t_ceil, y = ypos), shape = 17, size = 1.4,
+               aes(x = ceil_y, y = ypos), shape = 17, size = 1.4,
                color = "grey15") +
     geom_text_interactive(
-      aes(x = t_floor - 1, y = ypos, label = lab, fontface = face,
+      aes(x = floor_y - span * 0.018, y = ypos, label = lab, fontface = face,
           color = labcol, data_id = name, tooltip = tip),
       hjust = 1, size = base_size * 0.28, show.legend = FALSE) +
     scale_fill_identity() + scale_color_identity() +
-    scale_x_continuous(limits = c(t_floor - 24, t_ceil + 1),
-                       breaks = seq(40, 80, 10)) +
+    scale_x_continuous(limits = c(floor_y - span * 0.44, ceil_y + span * 0.02),
+                       breaks = breaks) +
     scale_y_continuous(limits = c(0.3, nrow(d) + 0.7), expand = c(0, 0)) +
+    theme_minimal(base_size = base_size) +
+    theme(axis.title = element_blank(),
+          axis.text.y = element_blank(),
+          panel.grid = element_blank(),
+          axis.text.x = element_text(color = "grey45"),
+          plot.margin = margin(6, 10, 6, 4))
+}
+
+#' Horizontal full-profile chart: every spectrum block in one scrollable view.
+#' The "standard bar chart" alternative to the circle (Frank & Miri feedback).
+#' Works in raw (1-4) or T-score mode; interactive like the other charts.
+plot_hitop_horizontal <- function(bars, defs = NULL,
+                                  tscore = TRUE,
+                                  t_floor = 30, t_ceil = 85,
+                                  score_range = c(1, 4),
+                                  base_size = 9.5,
+                                  spectrum_gap = 1.6) {
+  lvl_rank <- c(spectrum = 1, subfactor = 2, scale = 3)
+  floor_y <- if (tscore) t_floor else score_range[1]
+  ceil_y  <- if (tscore) t_ceil  else score_range[2]
+  span    <- ceil_y - floor_y
+  breaks  <- if (tscore) seq(40, 80, 10) else seq(score_range[1], score_range[2], 1)
+  
+  d <- bars |>
+    mutate(spectrum = factor(spectrum, levels = hitop_spectrum_order),
+           lvl_rank = lvl_rank[level]) |>
+    arrange(spectrum, !is.na(subfactor) | level != "spectrum",
+            subfactor, lvl_rank, name) |>
+    group_by(spectrum) |> mutate(.i = row_number()) |> ungroup()
+  
+  sizes <- d |> count(spectrum, name = "n") |>
+    mutate(off = cumsum(dplyr::lag(n, default = 0)) +
+             (dplyr::row_number() - 1) * spectrum_gap)
+  d <- d |>
+    left_join(sizes |> select(spectrum, off), by = "spectrum") |>
+    mutate(row = .i + off, ypos = max(row) + 1 - row,
+           fill = colorspace::darken(
+             hitop_spectrum_colors[as.character(spectrum)],
+             hitop_level_darken[level]),
+           lab = case_when(level == "spectrum"  ~ toupper(as.character(name)),
+                           level == "subfactor" ~ as.character(name),
+                           TRUE ~ paste0("    ", name)),
+           face = case_when(level == "spectrum"  ~ "bold",
+                            level == "subfactor" ~ "bold.italic",
+                            TRUE ~ "plain"),
+           mean_c = pmin(pmax(mean, floor_y), ceil_y),
+           lo_c   = pmin(pmax(lo, floor_y), ceil_y),
+           hi_c   = pmin(pmax(hi, floor_y), ceil_y),
+           capped = mean > ceil_y,
+           flag = if ("flag" %in% names(bars)) flag else "ok",
+           n_answered = if ("n_answered" %in% names(bars)) n_answered else NA,
+           n_total = if ("n_total" %in% names(bars)) n_total else NA,
+           tip = paste0(
+             ifelse(is.na(mean), as.character(name),
+                    if (tscore) {
+                      sprintf("%s\nT = %.1f (%s)\n%s level%s",
+                              name, mean, hitop_severity_label(mean), level,
+                              ifelse(level == "scale",
+                                     "\nclick for item responses", ""))
+                    } else {
+                      sprintf("%s\nscore = %.2f (1\u20134 scale)\n%s level%s",
+                              name, mean, level,
+                              ifelse(level == "scale",
+                                     "\nclick for item responses", ""))
+                    }),
+             tip_missing(flag, n_answered, n_total),
+             tip_def(name, defs)),
+           lab = ifelse(flag == "prorated" | flag == "partial",
+                        paste0(lab, "*"), lab),
+           labcol = ifelse(flag == "suppressed", "grey60", fill))
+  
+  ymax <- max(d$ypos) + 0.7
+  p <- ggplot(d)
+  if (tscore) {
+    bands <- hitop_severity_bands
+    bands$lo <- pmax(bands$lo, floor_y); bands$hi <- pmin(bands$hi, ceil_y)
+    p <- p +
+      geom_rect(data = bands,
+                aes(xmin = lo, xmax = hi, ymin = 0.3, ymax = ymax,
+                    alpha = band),
+                fill = "grey10", show.legend = FALSE) +
+      scale_alpha_manual(values = setNames(bands$alpha, bands$band)) +
+      geom_vline(xintercept = c(60, 65, 70), color = "grey55",
+                 linewidth = 0.25, linetype = "31")
+  } else {
+    p <- p + geom_vline(xintercept = breaks, color = "grey88",
+                        linewidth = 0.3)
+  }
+  
+  p +
+    geom_rect_interactive(
+      data = d |> filter(!is.na(mean)),
+      aes(xmin = floor_y, xmax = mean_c,
+          ymin = ypos - 0.38, ymax = ypos + 0.38,
+          fill = fill, data_id = name, tooltip = tip),
+      show.legend = FALSE) +
+    geom_point_interactive(
+      data = d |> filter(is.na(mean)),
+      aes(x = floor_y + span * 0.02, y = ypos,
+          data_id = name, tooltip = tip),
+      shape = 4, size = 1.5, stroke = 0.7, color = "grey55") +
+    geom_errorbarh(aes(xmin = lo_c, xmax = hi_c, y = ypos),
+                   height = 0.3, linewidth = 0.8, color = "white",
+                   na.rm = TRUE) +
+    geom_errorbarh(aes(xmin = lo_c, xmax = hi_c, y = ypos),
+                   height = 0.26, linewidth = 0.28, color = "grey15",
+                   na.rm = TRUE) +
+    geom_point(data = d |> filter(capped),
+               aes(x = ceil_y, y = ypos), shape = 17, size = 1.2,
+               color = "grey15") +
+    geom_text_interactive(
+      aes(x = floor_y - span * 0.015, y = ypos, label = lab,
+          fontface = face, color = labcol,
+          data_id = name, tooltip = tip),
+      hjust = 1, size = base_size * 0.24, show.legend = FALSE) +
+    scale_fill_identity() + scale_color_identity() +
+    scale_x_continuous(limits = c(floor_y - span * 0.42, ceil_y + span * 0.02),
+                       breaks = breaks, position = "top") +
+    scale_y_continuous(limits = c(0.3, ymax), expand = c(0, 0)) +
     theme_minimal(base_size = base_size) +
     theme(axis.title = element_blank(),
           axis.text.y = element_blank(),

@@ -40,6 +40,19 @@ app_css <- "
   .anchor-note { font-size: 13px; color: #5A6478; margin-bottom: 12px; }
   .nav-tabs > li > a { color: #3B4356; font-weight: 500; }
   a code { color: #3E77B5; text-decoration: underline; }
+  .callout-warn { background: #FFF8E6; border: 1px solid #EBCB8B;
+                  border-left: 4px solid #E8A13B; border-radius: 8px;
+                  padding: 10px 14px; font-size: 13px; color: #6B4F0F;
+                  margin-bottom: 12px; }
+  .callout-danger { background: #FDF0EF; border: 1px solid #E8B0AA;
+                    border-left: 4px solid #C0392B; border-radius: 8px;
+                    padding: 12px 16px; font-size: 14px; color: #7C2D24;
+                    margin-bottom: 16px; }
+  #oneko-credit { display: none; position: fixed; bottom: 12px; right: 48px;
+                  z-index: 790; font-size: 11px; color: #8B94A6;
+                  background: #fff; border: 1px solid #E4E7EE;
+                  border-radius: 99px; padding: 3px 10px; opacity: 0.85; }
+  #oneko-credit a { color: #3E77B5; }
 
   /* ---- small-screen gate ---- */
   #mobile-gate { display: none; }
@@ -185,12 +198,14 @@ ui <- fluidPage(
   div(id = "mobile-gate",
       img(src = "hitop_loader.gif", alt = "HiTOP"),
       h3("HiTOP-SR Scoring"),
-      p("This tool is designed for desktop browsers. Please open it on a ",
-        "computer, or widen this window, to enter responses and view the ",
-        "results.")),
+      p(strong("This window is too narrow for the app."),
+        " The 405-item entry grid and charts need a desktop-width browser ",
+        "window (this is not a loading screen \u2014 nothing more will load ",
+        "here). Please open the app on a computer, or widen this window, ",
+        "and it will appear immediately.")),
   div(class = "app-header",
       a(class = "gh-link", target = "_blank",
-        href = "https://github.com/hitop-sawd/hitopsr-scoring",
+        href = "https://github.com/hitop-sawd/hitopsr-scoring/tree/main",
         title = "View source on GitHub",
         HTML('<svg viewBox="0 0 16 16" aria-hidden="true"><path d="M8 0C3.58 0 0 3.58 0 8c0 3.54 2.29 6.53 5.47 7.59.4.07.55-.17.55-.38 0-.19-.01-.82-.01-1.49-2.01.37-2.53-.49-2.69-.94-.09-.23-.48-.94-.82-1.13-.28-.15-.68-.52-.01-.53.63-.01 1.08.58 1.23.82.72 1.21 1.87.87 2.33.66.07-.52.28-.87.51-1.07-1.78-.2-3.64-.89-3.64-3.95 0-.87.31-1.59.82-2.15-.08-.2-.36-1.02.08-2.12 0 0 .67-.21 2.2.82.64-.18 1.32-.27 2-.27.68 0 1.36.09 2 .27 1.53-1.04 2.2-.82 2.2-.82.44 1.1.16 1.92.08 2.12.51.56.82 1.27.82 2.15 0 3.07-1.87 3.75-3.65 3.95.29.25.54.73.54 1.48 0 1.07-.01 1.93-.01 2.2 0 .21.15.46.55.38A8.01 8.01 0 0 0 16 8c0-4.42-3.58-8-8-8Z"/></svg>')),
       h2("HiTOP-SR Scoring",
@@ -203,8 +218,56 @@ ui <- fluidPage(
   div(class = "brand-bar",
       div(class = "brand-light"), div(class = "brand-mid"),
       div(class = "brand-dark")),
+  span(id = "oneko-credit",
+       a("oneko", href = "https://github.com/adryd325/oneko.js",
+         target = "_blank"), " by adryd"),
   
   tabsetPanel(id = "main_tabs",
+              
+              tabPanel("About", br(),
+                       div(class = "callout-danger",
+                           strong("This web app is IN DEVELOPMENT and NOT READY FOR USE. "),
+                           "Scores, reference norms, and composite structure are placeholders ",
+                           "to demonstrate what the tool could look like. They are NOT ",
+                           "endorsed by the HiTOP Society or validated for clinical ",
+                           "interpretation."),
+                       div(class = "card",
+                           h4("Notes for interpretation"),
+                           p("Scores are shown as T-scores (mean: 50, SD: 10) relative to ",
+                             "preliminary norms pooled from a Prolific community sample collected",
+                             "in Phase 2 of HiTOP-SR development by the Measure Development Workgroup (n \u2248 780)",
+                             "and a University of Kansas student sample (n = 411). Severity bands (minimal < 60, mild 60\u201365, moderate 65\u201370, ",
+                             "severe \u2265 70) are provisional conventions, not validated ",
+                             "clinical cutoffs. Error bars are \u00B11 SEM across the items ",
+                             "within each scale."),
+                           h4("Missing data"),
+                           p("Scale scores are computed from available items (proration / ",
+                             "person-mean imputation) only when at least 75% of a scale's ",
+                             "items are answered; otherwise the scale is not scored and is ",
+                             "marked \u2715 in the charts. Any scale scored from incomplete ",
+                             "items, and any composite built on such scales, is marked * and ",
+                             "should be interpreted with caution: research shows prorated ",
+                             "scores can be biased even when items are missing completely at ",
+                             "random (",
+                             a("Mazza et al., 2015",
+                               href = "https://doi.org/10.1080/00273171.2015.1068157",
+                               target = "_blank"),
+                             "; see also ",
+                             a("Wu et al., 2022",
+                               href = "https://doi.org/10.3758/s13428-021-01671-w",
+                               target = "_blank"),
+                             ", on proration cutoffs). Whenever possible, complete all ",
+                             "items before interpreting the results."),
+                           h4("Attributions"),
+                           p("The HiTOP-SR was developed by the HiTOP Society ",
+                             "(Hierarchical Taxonomy of Psychopathology Society, 2024). ",
+                             "The development of this app was aided by functions in the ",
+                             a(code("hitop"),
+                               href = "https://github.com/jmgirard/hitop",
+                               target = "_blank"),
+                             " package developed by Jeffrey Girard. This web app is currently IN ",
+                             "DEVELOPMENT by the HiTOP Software and Development Workgroup ",
+                             "and is NOT READY FOR USE."))),
               
               # ---------------- Data entry ------------------------------------------
               tabPanel("1 \u00B7 Enter responses", br(),
@@ -277,23 +340,42 @@ ui <- fluidPage(
               ),
               
               # ---------------- Panel 1: circular profile ---------------------------
-              tabPanel("2 \u00B7 Visualization", br(),
+              tabPanel("2 \u00B7 All scales", br(),
                        div(class = "card",
                            fluidRow(
-                             column(4, selectInput("norm_group", "Preliminary reference norms",
-                                                   c("Combined" = "pool",
-                                                     "Community (Prolific)"   = "pro",
-                                                     "Students (KU)"          = "ku"))),
-                             column(4, checkboxInput("show_err",
-                                                     "Show measurement error bars (\u00B11 SEM)", TRUE)),
-                             column(4, style = "text-align:right;padding-top:24px;",
+                             column(3,
+                                    checkboxInput("show_t", "Preliminary T-scores", FALSE),
+                                    checkboxInput("show_comp", "Preliminary composites", FALSE)),
+                             column(3, conditionalPanel("input.show_t",
+                                                        selectInput("norm_group", "Reference norms (placeholder)",
+                                                                    c("Combined" = "pool",
+                                                                      "Community (Prolific)"   = "pro",
+                                                                      "Students (KU)"          = "ku")))),
+                             column(3, style = "text-align:right;padding-top:24px;",
+                                    checkboxInput("show_err",
+                                                  "Error bars (\u00B11 SEM)", TRUE),
                                     downloadButton("dl_plot", "Download PNG"))
                            ),
+                           conditionalPanel("input.show_t",
+                                            div(class = "callout-warn",
+                                                strong("Preliminary T-scores: "),
+                                                "based on placeholder norms that are not population-",
+                                                "representative and not endorsed by the HiTOP Society. ",
+                                                "Not validated for clinical interpretation.")),
+                           conditionalPanel("input.show_comp",
+                                            div(class = "callout-warn",
+                                                strong("Preliminary composites: "),
+                                                "the assignment of scales to subfactors and spectra is ",
+                                                "theoretical, and scoring of higher-order dimensions has not ",
+                                                "been validated.")),
                            div(class = "anchor-note",
-                               "Hover any bar or label to isolate it; all other bars gray out.")
+                               "Hover any bar or label to isolate it; all other bars gray out. ",
+                               "Raw scale scores (1\u20134) are shown by default. ",
+                               "Click any bar \u2014 or open the next tab \u2014 for the ",
+                               "detailed spectrum-level view and item responses.")
                        ),
                        div(class = "card",
-                           withLoader(girafeOutput("circular_plot", height = "840px"),
+                           withLoader(girafeOutput("circular_plot", height = "auto"),
                                       type = "image", loader = "hitop_loader.gif"))
               ),
               
@@ -304,64 +386,27 @@ ui <- fluidPage(
                              column(5, selectInput("detail_spectrum", "Spectrum",
                                                    choices = hitop_spectrum_order)),
                              column(7, div(class = "anchor-note", style = "padding-top:26px;",
-                                           "Click any bar in the circular bar chart to jump here. ",
+                                           "Click any bar in the all-scales view to jump here. ",
                                            "Click a scale bar below to see the item responses behind it."))
-                           )
+                           ),
+                           conditionalPanel("input.show_t",
+                                            div(class = "callout-warn",
+                                                strong("Preliminary T-scores: "),
+                                                "based on placeholder norms that are not population-",
+                                                "representative and not endorsed by the HiTOP Society. ",
+                                                "Not validated for clinical interpretation.")),
+                           conditionalPanel("input.show_comp",
+                                            div(class = "callout-warn",
+                                                strong("Preliminary composites: "),
+                                                "the assignment of scales to subfactors and spectra is ",
+                                                "theoretical, and scoring of higher-order dimensions has not ",
+                                                "been validated."))
                        ),
                        div(class = "card",
                            withLoader(girafeOutput("detail_plot", height = "auto"),
                                       type = "image", loader = "hitop_loader.gif")),
                        div(class = "card", uiOutput("item_panel"))
-              ),
-              tabPanel("About", br(),
-                       div(class = "card",
-                           h4("Notes for interpretation"),
-                           p("Scores are shown as T-scores (mean: 50, SD: 10) relative to ",
-                             "preliminary norms pooled from a Prolific community sample collected",
-                             "in Phase 2 of HiTOP-SR development by the Measure Development Workgroup (n \u2248 780)",
-                             "and a University of Kansas student sample (n = 411). Severity bands (minimal < 60, mild 60\u201365, moderate 65\u201370, ",
-                             "severe \u2265 70) are provisional conventions, not validated ",
-                             "clinical cutoffs. Error bars are \u00B11 SEM across the items ",
-                             "within each scale."),
-                           h4("Missing data"),
-                           p("Scale scores are computed from available items (proration / ",
-                             "person-mean imputation) only when at least 75% of a scale's ",
-                             "items are answered; otherwise the scale is not scored and is ",
-                             "marked \u2715 in the charts. Any scale scored from incomplete ",
-                             "items, and any composite built on such scales, is marked * and ",
-                             "should be interpreted with caution: research shows prorated ",
-                             "scores can be biased even when items are missing completely at ",
-                             "random (",
-                             a("Mazza et al., 2015",
-                               href = "https://doi.org/10.1080/00273171.2015.1068157",
-                               target = "_blank"),
-                             "; see also ",
-                             a("Wu et al., 2022",
-                               href = "https://doi.org/10.3758/s13428-021-01671-w",
-                               target = "_blank"),
-                             ", on proration cutoffs). Whenever possible, complete all ",
-                             "items before interpreting the results."),
-                           h4("Attributions"),
-                           p("The HiTOP-SR was developed by the HiTOP Society ",
-                             "(Hierarchical Taxonomy of Psychopathology Society, 2024). ",
-                             "The development of this app was aided by functions in the ",
-                             a(code("hitop"),
-                               href = "https://github.com/jmgirard/hitop",
-                               target = "_blank"),
-                             " package developed by Jeffrey Girard. This web app is currently IN ",
-                             "DEVELOPMENT by the HiTOP Software and Development Workgroup ",
-                             "and is NOT READY FOR USE."),
-                           h4("Extras"),
-                           p(a(href = "#", "Summon a cursor cat",
-                               onclick = paste0(
-                                 "if (window.toggleOneko) {",
-                                 "  var on = window.toggleOneko();",
-                                 "  this.textContent = on ? 'Dismiss the cursor cat'",
-                                 "                        : 'Summon the cursor cat';",
-                                 "} return false;")),
-                             " \u2014 a small pixel companion that chases your mouse ",
-                             "(", a("oneko", href = "https://github.com/adryd325/oneko.js",
-                                    target = "_blank"), ").")))
+              )
   ),
   
   # JS goes last so item texts are available
@@ -510,7 +555,7 @@ server <- function(input, output, session) {
                "missing items before interpreting the results."),
         easyClose = TRUE, footer = modalButton("Understood")))
     }
-    updateTabsetPanel(session, "main_tabs", selected = "2 \u00B7 Visualization")
+    updateTabsetPanel(session, "main_tabs", selected = "2 \u00B7 All scales")
   })
   
   # ---- shared T-scored bars ----------------------------------------------
@@ -519,22 +564,31 @@ server <- function(input, output, session) {
                                pro  = c(mean = "mean_pro",  sd = "sd_pool"),
                                ku   = c(mean = "mean_ku",   sd = "sd_pool")))
   
-  bars_t <- reactive({
+  bars_display <- reactive({
     req(submitted())
-    bars <- apply_norms(submitted(), norms, norm_cols())
+    bars <- submitted()
+    if (!isTRUE(input$show_comp)) bars <- bars[bars$level == "scale", ]
+    if (isTRUE(input$show_t)) bars <- apply_norms(bars, norms, norm_cols())
     if (!isTRUE(input$show_err)) bars$lo <- bars$hi <- NA_real_
     bars
   })
   
-  profile_plot <- reactive(plot_hitop_circular(bars_t(), defs = scale_defs))
+  profile_plot <- reactive(
+    plot_hitop_horizontal(bars_display(), defs = scale_defs,
+                          tscore = isTRUE(input$show_t)))
   
-  output$circular_plot <- renderGirafe(hitop_girafe(profile_plot()))
+  output$circular_plot <- renderGirafe({
+    n <- nrow(bars_display())
+    hitop_girafe(profile_plot(), w = 9.5, h = max(4, 0.145 * n + 1.5))
+  })
   
   output$dl_plot <- downloadHandler(
     filename = function() sprintf("hitop_profile_%s.png", Sys.Date()),
-    content = function(file)
-      ggsave(file, profile_plot(), width = 11, height = 11,
-             dpi = 200, bg = "white"))
+    content = function(file) {
+      n <- nrow(bars_display())
+      ggsave(file, profile_plot(), width = 10,
+             height = max(4, 0.145 * n + 1.5), dpi = 200, bg = "white")
+    })
   
   # ---- click routing: circular profile -> panel 3 --------------------------
   observeEvent(input$circular_plot_selected, {
@@ -570,11 +624,12 @@ server <- function(input, output, session) {
   })
   
   output$detail_plot <- renderGirafe({
-    req(bars_t())
-    d <- bars_t()[bars_t()$spectrum == sel_spectrum(), ]
+    req(bars_display())
+    d <- bars_display()[bars_display()$spectrum == sel_spectrum(), ]
     h <- max(2, 0.30 * nrow(d) + 1)
-    hitop_girafe(plot_spectrum_detail(bars_t(), sel_spectrum(),
-                                      defs = scale_defs),
+    hitop_girafe(plot_spectrum_detail(bars_display(), sel_spectrum(),
+                                      defs = scale_defs,
+                                      tscore = isTRUE(input$show_t)),
                  w = 9.5, h = h)
   })
   
@@ -593,8 +648,11 @@ server <- function(input, output, session) {
     scored <- ifelse(ki$reverse, 5 - r, r)
     ord <- order(-ifelse(is.na(scored), -1, scored), ki$item)
     
-    tb <- bars_t()
+    tb <- bars_display()
     trow <- tb[tb$level == "scale" & tb$name == sc, ]
+    score_txt <- if (isTRUE(input$show_t))
+      sprintf("T = %.1f (%s)", trow$mean, hitop_severity_label(trow$mean))
+    else sprintf("mean score = %.2f", trow$mean)
     
     rows <- lapply(ord, function(j) {
       v <- r[j]
@@ -615,8 +673,8 @@ server <- function(input, output, session) {
     tagList(
       h4(sprintf("%s \u2014 item responses", sc)),
       div(class = "anchor-note", sprintf(
-        "%d items \u00B7 1 = not at all, 2 = a little, 3 = moderately, 4 = a lot (past 12 months) \u00B7 T = %.1f (%s) \u00B7 sorted by response, highest first",
-        nrow(ki), trow$mean, hitop_severity_label(trow$mean))),
+        "%d items \u00B7 1 = not at all, 2 = a little, 3 = moderately, 4 = a lot (past 12 months) \u00B7 %s \u00B7 sorted by response, highest first",
+        nrow(ki), score_txt)),
       rows
     )
   })
