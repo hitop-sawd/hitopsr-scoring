@@ -308,8 +308,8 @@ plot_hitop_circular <- function(bar_data,
 #' Error bars: scale = SEM across the scale's items; subfactor/spectrum =
 #' SEM across constituent scale scores. These reflect internal consistency
 #' of the profile, not test-retest precision.
-build_individual_bars <- function(resp, key, hierarchy, ci = 1,
-                                  max_missing = 0.25) {
+build_individual_bars <- function(resp, key, hierarchy, br_map = NULL,
+                                  ci = 1, max_missing = 0.25) {
   stopifnot(length(resp) == nrow(key))
   r <- as.numeric(resp)
   r[key$reverse] <- 5 - r[key$reverse]
@@ -353,8 +353,28 @@ build_individual_bars <- function(resp, key, hierarchy, ci = 1,
     function(d) comp(d, "subfactor", d$Subfactor[1], d$Spectrum[1],
                      d$Subfactor[1])))
   
-  spec_bars <- do.call(rbind, lapply(split(sc, sc$Spectrum), function(d)
-    comp(d, "spectrum", d$Spectrum[1], d$Spectrum[1], NA_character_)))
+  # Spectrum composites: HiTOP-BR item scoring within the SR responses
+  # (Miri's proposal). Each BR spectrum is the mean of its BR items; bars
+  # display within the rational family given by br_map$family. Falls back
+  # to rational scale-mean spectra if no br_map is supplied.
+  if (!is.null(br_map)) {
+    spec_bars <- do.call(rbind, lapply(split(br_map, br_map$br_spectrum),
+                                       function(m) {
+                                         x <- r[m$item]; n_tot <- length(x); x <- x[!is.na(x)]
+                                         ok <- length(x) / n_tot >= 1 - max_missing
+                                         mn <- if (ok) mean(x) else NA
+                                         sem <- if (length(x) > 1) sd(x) / sqrt(length(x)) else NA
+                                         data.frame(level = "spectrum", name = m$br_spectrum[1],
+                                                    spectrum = m$family[1], subfactor = NA_character_,
+                                                    mean = mn, lo = mn - ci * sem, hi = mn + ci * sem,
+                                                    n_answered = length(x), n_total = n_tot,
+                                                    flag = if (!ok) "suppressed"
+                                                    else if (length(x) < n_tot) "prorated" else "ok")
+                                       }))
+  } else {
+    spec_bars <- do.call(rbind, lapply(split(sc, sc$Spectrum), function(d)
+      comp(d, "spectrum", d$Spectrum[1], d$Spectrum[1], NA_character_)))
+  }
   
   out <- rbind(spec_bars, subf_bars, scale_bars)
   rownames(out) <- NULL
