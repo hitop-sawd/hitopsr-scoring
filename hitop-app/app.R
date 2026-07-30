@@ -8,6 +8,10 @@ hierarchy <- read.csv("data/hitopsr_hierarchy.csv")
 norms     <- read.csv("data/hitopsr_norms.csv")
 defs_df   <- read.csv("data/hitopsr_definitions.csv")
 br_map    <- read.csv("data/hitopbr_spectrum_map.csv")
+hierarchy_alt <- read.csv("data/hitopsr_hierarchy_alt.csv")
+rational_subs <- read.csv("data/hitopsr_rational_subscales.csv")
+sub_parent <- with(rational_subs[!duplicated(rational_subs$subscale), ],
+                   setNames(parent, subscale))
 scale_defs <- setNames(defs_df$Brief, defs_df$Scale)
 
 
@@ -356,15 +360,22 @@ ui <- fluidPage(
               tabPanel("2 \u00B7 All scales", br(),
                        div(class = "card",
                            fluidRow(
-                             column(3,
+                             column(3, style = "padding-top:4px;",
                                     checkboxInput("show_t", "Preliminary T-scores", FALSE),
-                                    checkboxInput("show_comp", "Preliminary composites", FALSE)),
-                             column(3, conditionalPanel("input.show_t",
+                                    conditionalPanel("!input.org_alt",
+                                                     checkboxInput("show_comp", "Preliminary composites", FALSE))),
+                             column(3,
+                                    checkboxInput("org_alt",
+                                                  "Alternative scale organization (measure paper)", FALSE),
+                                    checkboxInput("show_subs",
+                                                  paste0("Show rationally derived subscales for more detail ",
+                                                         "in the internalizing-distress scales"), FALSE)),
+                             column(2, conditionalPanel("input.show_t",
                                                         selectInput("norm_group", "Reference norms (placeholder)",
                                                                     c("Combined" = "pool",
                                                                       "Community (Prolific)"   = "pro",
                                                                       "Students (KU)"          = "ku")))),
-                             column(3, style = "text-align:right;padding-top:24px;",
+                             column(4, style = "text-align:right;padding-top:24px;",
                                     checkboxInput("show_err",
                                                   "Error bars (\u00B11 SEM)", TRUE),
                                     downloadButton("dl_plot", "Download PNG"))
@@ -375,7 +386,7 @@ ui <- fluidPage(
                                                 "based on placeholder norms that are not population-",
                                                 "representative and not endorsed by the HiTOP Society. ",
                                                 "Not validated for clinical interpretation.")),
-                           conditionalPanel("input.show_comp",
+                           conditionalPanel("input.show_comp && !input.org_alt",
                                             div(class = "callout-warn",
                                                 strong("Preliminary composites: "),
                                                 "spectrum scores use the HiTOP-BR items embedded within the ",
@@ -383,6 +394,13 @@ ui <- fluidPage(
                                                 "approach is a validated scoring of the higher-order ",
                                                 "structure, and spectrum T-scores reference the student ",
                                                 "sample only.")),
+                           conditionalPanel("input.org_alt",
+                                            div(class = "callout-warn",
+                                                strong("Alternative organization: "),
+                                                "scales are grouped as in Table 1 of the HiTOP-SR measure ",
+                                                "paper (rational consensus arrangement, not an empirically ",
+                                                "validated structure). Composite bars are unavailable under ",
+                                                "this organization.")),
                            div(class = "anchor-note",
                                "Hover any bar or label to isolate it; all other bars gray out. ",
                                "Raw scale scores (1\u20134) are shown by default. ",
@@ -541,7 +559,7 @@ server <- function(input, output, session) {
       output$submit_msg <- renderText("No responses entered yet."); return()
     }
     bars <- build_individual_bars(r, item_key, hierarchy, br_map)
-    submitted(bars); submitted_items(r)
+    submitted(bars); submitted_items(r)   # default-org bars for the modal
     
     sup <- bars$name[bars$level == "scale" & bars$flag == "suppressed"]
     pro <- bars$name[bars$level == "scale" & bars$flag == "prorated"]
@@ -581,10 +599,20 @@ server <- function(input, output, session) {
                                pro  = c(mean = "mean_pro",  sd = "sd_pool"),
                                ku   = c(mean = "mean_ku",   sd = "sd_pool")))
   
+  active_hier   <- reactive(if (isTRUE(input$org_alt)) hierarchy_alt else hierarchy)
+  active_colors <- reactive(if (isTRUE(input$org_alt)) hitop_alt_colors
+                            else hitop_spectrum_colors)
+  active_order  <- reactive(names(active_colors()))
+  
   bars_display <- reactive({
-    req(submitted())
-    bars <- submitted()
-    if (!isTRUE(input$show_comp)) bars <- bars[bars$level == "scale", ]
+    req(submitted_items())
+    bars <- build_individual_bars(
+      submitted_items(), item_key, active_hier(),
+      br_map = if (isTRUE(input$org_alt)) NULL else br_map,
+      subscales = if (isTRUE(input$show_subs)) rational_subs else NULL)
+    if (!"parent" %in% names(bars)) bars$parent <- NA_character_
+    keep_comp <- isTRUE(input$show_comp) && !isTRUE(input$org_alt)
+    if (!keep_comp) bars <- bars[bars$level %in% c("scale", "subscale"), ]
     if (isTRUE(input$show_t)) bars <- apply_norms(bars, norms, norm_cols())
     if (!isTRUE(input$show_err)) bars$lo <- bars$hi <- NA_real_
     bars
@@ -592,7 +620,9 @@ server <- function(input, output, session) {
   
   profile_plot <- reactive(
     plot_hitop_horizontal(bars_display(), defs = scale_defs,
-                          tscore = isTRUE(input$show_t)))
+                          tscore = isTRUE(input$show_t),
+                          spectrum_colors = active_colors(),
+                          spectrum_order = active_order()))
   
   output$circular_plot <- renderGirafe({
     n <- nrow(bars_display())
@@ -611,13 +641,15 @@ server <- function(input, output, session) {
   observeEvent(input$circular_plot_selected, {
     nm <- input$circular_plot_selected
     req(nm)
-    if (nm %in% hierarchy$Spectrum) {
+    hh <- active_hier()
+    if (nm %in% names(sub_parent)) nm <- sub_parent[[nm]]
+    if (nm %in% hh$Spectrum) {
       sel_spectrum(nm); sel_scale(NULL)
-    } else if (nm %in% hierarchy$Subfactor) {
+    } else if (!isTRUE(input$org_alt) && nm %in% hierarchy$Subfactor) {
       sel_spectrum(hierarchy$Spectrum[match(nm, hierarchy$Subfactor)])
       sel_scale(NULL)
-    } else if (nm %in% hierarchy$Scale) {
-      sel_spectrum(hierarchy$Spectrum[match(nm, hierarchy$Scale)])
+    } else if (nm %in% hh$Scale) {
+      sel_spectrum(hh$Spectrum[match(nm, hh$Scale)])
       sel_scale(nm)
     } else return()
     updateSelectInput(session, "detail_spectrum", selected = sel_spectrum())
@@ -631,11 +663,18 @@ server <- function(input, output, session) {
     }
   })
   
+  observeEvent(input$org_alt, {
+    sel_spectrum(active_order()[1]); sel_scale(NULL)
+    updateSelectInput(session, "detail_spectrum",
+                      choices = active_order(), selected = active_order()[1])
+  }, ignoreInit = TRUE)
+  
   # ---- panel 3: spectrum detail chart --------------------------------------
   observeEvent(input$detail_plot_selected, {
     nm <- input$detail_plot_selected
     req(nm)
-    if (nm %in% hierarchy$Scale) sel_scale(nm)
+    if (nm %in% names(sub_parent)) nm <- sub_parent[[nm]]
+    if (nm %in% active_hier()$Scale) sel_scale(nm)
     else showNotification("Click a scale bar to see its items.",
                           type = "message")
   })
@@ -646,7 +685,8 @@ server <- function(input, output, session) {
     h <- max(2, 0.30 * nrow(d) + 1)
     hitop_girafe(plot_spectrum_detail(bars_display(), sel_spectrum(),
                                       defs = scale_defs,
-                                      tscore = isTRUE(input$show_t)),
+                                      tscore = isTRUE(input$show_t),
+                                      spectrum_colors = active_colors()),
                  w = 9.5, h = h)
   })
   
@@ -659,7 +699,7 @@ server <- function(input, output, session) {
                "Click a scale bar above to see the item responses."))
     
     sc  <- sel_scale()
-    cam <- hierarchy$camel[match(sc, hierarchy$Scale)]
+    cam <- active_hier()$camel[match(sc, active_hier()$Scale)]
     ki  <- item_key[item_key$camel == cam, ]
     r   <- submitted_items()[ki$item]
     scored <- ifelse(ki$reverse, 5 - r, r)
