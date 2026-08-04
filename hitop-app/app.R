@@ -9,8 +9,8 @@ norms     <- read.csv("data/hitopsr_norms.csv")
 defs_df   <- read.csv("data/hitopsr_definitions.csv")
 br_map    <- read.csv("data/hitopbr_spectrum_map.csv")
 hierarchy_alt <- read.csv("data/hitopsr_hierarchy_alt.csv")
-rational_subs <- read.csv("data/hitopsr_rational_subscales.csv")
-sub_parent <- with(rational_subs[!duplicated(rational_subs$subscale), ],
+subs_all <- read.csv("data/hitopsr_subscales_all.csv")
+sub_parent <- with(subs_all[!duplicated(subs_all$subscale), ],
                    setNames(parent, subscale))
 scale_defs <- setNames(defs_df$Brief, defs_df$Scale)
 
@@ -362,9 +362,13 @@ ui <- fluidPage(
                            fluidRow(
                              column(3, style = "padding-top:4px;",
                                     checkboxInput("show_t", "Preliminary T-scores", FALSE),
-                                    checkboxInput("show_comp", "Preliminary composites", FALSE)),
+                                    checkboxInput("show_comp",
+                                                  "Include HiTOP-BR spectrum scale scores", FALSE)),
                              column(3,
-                                    checkboxInput("emp_org", "Show subscales", FALSE)),
+                                    checkboxInput("emp_org",
+                                                  "Order scales by rational assignment to spectra", FALSE),
+                                    checkboxInput("show_subs",
+                                                  "Include rationally derived subscales", FALSE)),
                              column(2, conditionalPanel("input.show_t",
                                                         selectInput("norm_group", "Reference norms (placeholder)",
                                                                     c("Combined" = "pool",
@@ -383,16 +387,32 @@ ui <- fluidPage(
                                                 "Not validated for clinical interpretation.")),
                            conditionalPanel("input.show_comp",
                                             div(class = "callout-warn",
-                                                strong("Preliminary composites: "),
+                                                strong("HiTOP-BR spectrum scale scores: "),
                                                 "spectrum scores use the HiTOP-BR items embedded within the ",
                                                 "HiTOP-SR. This is not a validated scoring of the ",
                                                 "higher-order structure, and spectrum T-scores reference the ",
                                                 "student sample only.")),
+                           conditionalPanel("input.emp_org",
+                                            div(class = "callout-warn",
+                                                strong("Rational ordering of scales: "),
+                                                "sorts scales according to the rational scale-to-spectrum ",
+                                                "assignment from the HiTOP-SR paper (Simms et al., under ",
+                                                "review).")),
+                           conditionalPanel("input.show_subs",
+                                            div(class = "callout-warn",
+                                                strong("Rationally derived subscales (marked \u02B3): "),
+                                                "these were not indicated by data in the scale development ",
+                                                "process, but were developed when conceptual or practical ",
+                                                "considerations indicated that subdividing a scale was ",
+                                                "necessary to preserve important content for clinical ",
+                                                "applications.")),
                            div(class = "anchor-note",
                                "Hover any bar or label to isolate it; all other bars gray out. ",
                                "Raw scale scores (1\u20134) are listed alphabetically by ",
-                               "default. Click any bar \u2014 or open the next tab \u2014 ",
-                               "for the detailed group-level view and item responses.")
+                               "default. Subscales are italicised and listed under the scale ",
+                               "that they parse in more detail. Click any bar \u2014 or open ",
+                               "the next tab \u2014 for the detailed group-level view and ",
+                               "item responses.")
                        ),
                        div(class = "card",
                            withLoader(girafeOutput("circular_plot", height = "auto"),
@@ -404,13 +424,7 @@ ui <- fluidPage(
                        div(class = "card",
                            fluidRow(
                              column(5, selectInput("detail_spectrum", "Scale group",
-                                                   choices = hitop_alt_order),
-                                    conditionalPanel(
-                                      "input.detail_spectrum == 'Internalizing-Distress'",
-                                      checkboxInput("show_subs",
-                                                    paste0("Show rationally derived subscales for more ",
-                                                           "detail in the internalizing-distress scales"),
-                                                    FALSE))),
+                                                   choices = hitop_alt_order)),
                              column(7, div(class = "anchor-note", style = "padding-top:26px;",
                                            "Click any bar in the all-scales view to jump here. ",
                                            "Click a scale bar below to see the item responses behind it."))
@@ -423,7 +437,7 @@ ui <- fluidPage(
                                                 "Not validated for clinical interpretation.")),
                            conditionalPanel("input.show_comp",
                                             div(class = "callout-warn",
-                                                strong("Preliminary composites: "),
+                                                strong("HiTOP-BR spectrum scale scores: "),
                                                 "spectrum scores use the HiTOP-BR items embedded within the ",
                                                 "HiTOP-SR; subfactor scores are rational scale means. Neither ",
                                                 "approach is a validated scoring of the higher-order ",
@@ -609,9 +623,12 @@ server <- function(input, output, session) {
     if (isTRUE(input$show_comp)) {
       bm <- br_map; bm$family <- "HiTOP-BR spectra"
     }
-    bars <- build_individual_bars(submitted_items(), item_key, h, br_map = bm)
+    ss <- if (isTRUE(input$show_subs)) subs_all
+    else subs_all[subs_all$type == "empirical", ]
+    bars <- build_individual_bars(submitted_items(), item_key, h,
+                                  br_map = bm, subscales = ss)
     if (!"parent" %in% names(bars)) bars$parent <- NA_character_
-    keep <- if (isTRUE(input$show_comp)) c("scale", "spectrum") else "scale"
+    keep <- c("scale", "subscale", if (isTRUE(input$show_comp)) "spectrum")
     bars <- bars[bars$level %in% keep, ]
     if (isTRUE(input$show_t)) bars <- apply_norms(bars, norms, norm_cols())
     if (!isTRUE(input$show_err)) bars$lo <- bars$hi <- NA_real_
@@ -623,7 +640,8 @@ server <- function(input, output, session) {
     req(submitted_items())
     bars <- build_individual_bars(
       submitted_items(), item_key, hierarchy_alt,
-      subscales = if (isTRUE(input$show_subs)) rational_subs else NULL)
+      subscales = if (isTRUE(input$show_subs)) subs_all
+      else subs_all[subs_all$type == "empirical", ])
     if (!"parent" %in% names(bars)) bars$parent <- NA_character_
     bars <- bars[bars$level %in% c("scale", "subscale"), ]
     if (isTRUE(input$show_t)) bars <- apply_norms(bars, norms, norm_cols())
