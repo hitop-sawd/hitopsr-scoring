@@ -39,8 +39,8 @@ hitop_spectrum_colors <- c(
   "Somatoform"                     = "#E03131"
 )
 hitop_spectrum_order <- names(hitop_spectrum_colors)
-hitop_level_darken   <- c(spectrum = 0, subfactor = 0.25, scale = 0.45,
-                          subscale = 0.6)
+hitop_level_darken   <- c(header = 0, spectrum = 0, subfactor = 0.25,
+                          scale = 0.45, subscale = 0.6)
 
 # Alternative organization (measure paper, Table 1): 12 groups
 hitop_alt_colors <- c(
@@ -157,179 +157,6 @@ apply_norms <- function(bar_data, norms,
 
 #' Circular bar chart. With tscore = TRUE (default), the radial axis is in
 #' T units with shaded severity rings; tscore = FALSE plots raw scores.
-plot_hitop_circular <- function(bar_data,
-                                defs = NULL,
-                                tscore = TRUE,
-                                t_floor = 30, t_ceil = 85,
-                                score_range = c(1, 4),
-                                gap = 2,
-                                base_size = 11) {
-  
-  lvl_rank <- c(spectrum = 1, subfactor = 2, scale = 3)
-  
-  df <- bar_data |>
-    mutate(spectrum = factor(spectrum, levels = hitop_spectrum_order),
-           lvl_rank = lvl_rank[level]) |>
-    arrange(spectrum,
-            !is.na(subfactor) | level != "spectrum",
-            subfactor, lvl_rank, name) |>
-    group_by(spectrum) |> mutate(.within = row_number()) |> ungroup()
-  
-  spec_sizes <- df |> count(spectrum, name = "n_bars") |>
-    mutate(offset = cumsum(dplyr::lag(n_bars + gap, default = 0)))
-  df <- df |>
-    left_join(spec_sizes |> select(spectrum, offset), by = "spectrum") |>
-    mutate(x = .within + offset)
-  total_slots <- max(df$x) + gap
-  
-  df <- df |>
-    mutate(fill = colorspace::darken(
-      hitop_spectrum_colors[as.character(spectrum)],
-      hitop_level_darken[level]))
-  
-  # radial scale setup
-  if (tscore) {
-    floor_y <- t_floor
-    df <- df |>
-      mutate(mean_c = pmin(pmax(mean, floor_y), t_ceil),
-             lo_c   = pmin(pmax(lo, floor_y), t_ceil),
-             hi_c   = pmin(pmax(hi, floor_y), t_ceil),
-             capped = mean > t_ceil)
-    ring_breaks <- seq(40, 80, 10)
-    axis_top    <- t_ceil
-  } else {
-    floor_y <- score_range[1]
-    df <- df |> mutate(mean_c = mean,
-                       lo_c = pmax(lo, floor_y), hi_c = hi, capped = FALSE)
-    ring_breaks <- seq(score_range[1], score_range[2], 1)
-    axis_top    <- score_range[2]
-  }
-  label_r <- axis_top + (axis_top - floor_y) * 0.03
-  hollow  <- floor_y - (axis_top - floor_y) * 0.75
-  
-  df <- df |>
-    mutate(deg   = 90 - 360 * (x - 0.5) / total_slots,
-           hjust = ifelse(deg < -90, 1, 0),
-           angle = ifelse(deg < -90, deg + 180, deg),
-           lab   = ifelse(level == "spectrum", toupper(name), name),
-           face  = case_when(level == "spectrum" ~ "bold",
-                             level == "subfactor" ~ "bold.italic",
-                             TRUE ~ "plain"),
-           # tooltip + hover identity for interactive rendering
-           flag = if ("flag" %in% names(bar_data)) flag else "ok",
-           n_answered = if ("n_answered" %in% names(bar_data)) n_answered else NA,
-           n_total = if ("n_total" %in% names(bar_data)) n_total else NA,
-           tip = paste0(
-             ifelse(is.na(mean), name,
-                    if (tscore) {
-                      sprintf("%s\nT = %.1f (%s)\n%s level",
-                              name, mean, hitop_severity_label(mean), level)
-                    } else {
-                      sprintf("%s\nscore = %.2f\n%s level", name, mean, level)
-                    }),
-             tip_missing(flag, n_answered, n_total),
-             tip_def(name, defs)),
-           stype = if ("stype" %in% names(bars)) stype else NA_character_,
-           lab = ifelse(!is.na(stype) & stype == "rational",
-                        paste0(lab, "\u02B3"), lab),
-           lab = ifelse(flag == "prorated" | flag == "partial",
-                        paste0(lab, "*"), lab),
-           labcol = ifelse(flag == "suppressed", "grey60", fill))
-  
-  p <- ggplot(df)
-  
-  # severity band annuli (T-score mode only), gray shades + top-right legend
-  if (tscore) {
-    bands <- hitop_severity_bands |>
-      mutate(lo = pmax(lo, floor_y), hi = pmin(hi, axis_top))
-    p <- p +
-      geom_rect(data = bands,
-                aes(xmin = 0, xmax = total_slots,
-                    ymin = lo, ymax = hi, alpha = band),
-                fill = "grey10") +
-      scale_alpha_manual(
-        values = setNames(bands$alpha, bands$band),
-        name = "T-score (based on preliminary norms)",
-        labels = c(severe = "severe (T \u2265 70)",
-                   moderate = "moderate (65\u201370)",
-                   mild = "mild (60\u201365)",
-                   minimal = "minimal (< 60)"),
-        guide = guide_legend(override.aes = list(fill = "grey10"))
-      ) +
-      geom_hline(yintercept = c(60, 65, 70),
-                 color = "grey55", linewidth = 0.25, linetype = "31")
-  }
-  show_tag <- any(df$flag %in% c("prorated", "partial"))
-  
-  out <- p +
-    geom_hline(yintercept = ring_breaks, color = "grey85", linewidth = 0.3) +
-    geom_rect_interactive(
-      data = df |> filter(!is.na(mean)),
-      aes(xmin = x - 0.46, xmax = x + 0.46,
-          ymin = floor_y, ymax = mean_c, fill = fill,
-          data_id = name, tooltip = tip),
-      show.legend = FALSE) +
-    geom_point_interactive(
-      data = df |> filter(is.na(mean)),
-      aes(x = x, y = floor_y + (axis_top - floor_y) * 0.04,
-          data_id = name, tooltip = tip),
-      shape = 4, size = 1.4, stroke = 0.7, color = "grey55") +
-    geom_errorbar(aes(x = x, ymin = lo_c, ymax = hi_c),
-                  width = 0.38, linewidth = 0.9, color = "white",
-                  na.rm = TRUE) +
-    geom_errorbar(aes(x = x, ymin = lo_c, ymax = hi_c),
-                  width = 0.35, linewidth = 0.3, color = "grey15",
-                  na.rm = TRUE) +
-    # arrow marker for bars clipped at the ceiling
-    geom_point(data = df |> filter(capped),
-               aes(x = x, y = axis_top), shape = 17, size = 1.2,
-               color = "grey15") +
-    geom_text_interactive(
-      aes(x = x, y = label_r, label = lab, angle = angle,
-          hjust = hjust, fontface = face, color = labcol,
-          data_id = name, tooltip = tip),
-      size = base_size * 0.18, show.legend = FALSE) +
-    annotate("text", x = total_slots, y = ring_breaks, label = ring_breaks,
-             size = base_size * 0.22, color = "grey45") +
-    scale_fill_identity() + scale_color_identity() +
-    scale_x_continuous(limits = c(0, total_slots), expand = c(0, 0)) +
-    scale_y_continuous(limits = c(hollow, label_r +
-                                    (axis_top - floor_y) * 0.55)) +
-    coord_polar(start = 0, clip = "off") +
-    theme_void(base_size = base_size) +
-    theme(plot.margin = margin(4, 4, 4, 4),
-          legend.position = "inside",
-          legend.position.inside = c(0.99, 0.99),
-          legend.justification = c(1, 1),
-          legend.title = element_text(size = base_size * 0.85,
-                                      face = "bold", color = "grey25"),
-          legend.text = element_text(size = base_size * 0.78,
-                                     color = "grey25"),
-          legend.key.size = unit(base_size * 1.1, "pt"),
-          legend.key = element_rect(color = "grey75", linewidth = 0.3))
-  
-  if (show_tag) {
-    out <- out +
-      labs(tag = "* included one or more missing responses") +
-      theme(plot.tag.location = "plot",
-            plot.tag.position = c(0.985, 0.872),
-            plot.tag = element_text(size = base_size * 0.72,
-                                    color = "grey30", hjust = 1))
-  }
-  out
-}
-
-# =============================================================================
-# Individual-level helpers (clinician single-client workflow)
-# =============================================================================
-
-#' Score one client's 405 item responses into bar data with item-level SEMs.
-#' resp: numeric vector of length 405 (values 1-4 or NA), administration order.
-#' key: hitopsr_item_key.csv (item, text, reverse, camel)
-#' hierarchy: hitopsr_hierarchy.csv (Spectrum, Subfactor, Scale, camel)
-#' Error bars: scale = SEM across the scale's items; subfactor/spectrum =
-#' SEM across constituent scale scores. These reflect internal consistency
-#' of the profile, not test-retest precision.
 build_individual_bars <- function(resp, key, hierarchy, br_map = NULL,
                                   subscales = NULL,
                                   ci = 1, max_missing = 0.25) {
@@ -598,11 +425,25 @@ plot_hitop_horizontal <- function(bars, defs = NULL,
   span    <- ceil_y - floor_y
   breaks  <- if (tscore) seq(40, ceil_y - 5, 10) else seq(score_range[1], score_range[2], 1)
   
+  # group headings whenever more than one group is displayed
+  if (length(unique(bars$spectrum)) > 1) {
+    hdr <- data.frame(level = "header",
+                      name = unique(as.character(bars$spectrum)),
+                      spectrum = unique(as.character(bars$spectrum)),
+                      subfactor = NA_character_, mean = NA_real_,
+                      lo = NA_real_, hi = NA_real_,
+                      n_answered = NA_real_, n_total = NA_real_,
+                      flag = "ok")
+    for (cc in setdiff(names(bars), names(hdr))) hdr[[cc]] <- NA
+    bars <- rbind(bars, hdr[, names(bars)])
+  }
+  lvl_rank <- c(header = 0, lvl_rank)
+  
   d <- bars |>
     mutate(spectrum = factor(spectrum, levels = spectrum_order),
            lvl_rank = lvl_rank[level],
            sortkey = ifelse(level == "subscale", parent, name)) |>
-    arrange(spectrum, !is.na(subfactor) | level != "spectrum",
+    arrange(spectrum, lvl_rank > 1,
             subfactor, sortkey, lvl_rank, name) |>
     group_by(spectrum) |> mutate(.i = row_number()) |> ungroup()
   
@@ -615,11 +456,13 @@ plot_hitop_horizontal <- function(bars, defs = NULL,
            fill = colorspace::darken(
              spectrum_colors[as.character(spectrum)],
              hitop_level_darken[level]),
-           lab = case_when(level == "spectrum"  ~ toupper(as.character(name)),
+           lab = case_when(level == "header"    ~ toupper(as.character(name)),
+                           level == "spectrum"  ~ as.character(name),
                            level == "subfactor" ~ as.character(name),
                            level == "subscale"  ~ paste0("        ", name),
                            TRUE ~ paste0("    ", name)),
-           face = case_when(level == "spectrum"  ~ "bold",
+           face = case_when(level == "header"    ~ "bold",
+                            level == "spectrum"  ~ "bold",
                             level == "subfactor" ~ "bold.italic",
                             level == "subscale"  ~ "italic",
                             TRUE ~ "plain"),
@@ -630,23 +473,26 @@ plot_hitop_horizontal <- function(bars, defs = NULL,
            flag = if ("flag" %in% names(bars)) flag else "ok",
            n_answered = if ("n_answered" %in% names(bars)) n_answered else NA,
            n_total = if ("n_total" %in% names(bars)) n_total else NA,
-           tip = paste0(
-             ifelse(is.na(mean), as.character(name),
-                    if (tscore) {
-                      sprintf("%s\nT = %.1f (%s)\n%s level%s%s",
-                              name, mean, hitop_severity_label(mean), level,
-                              ifelse(level == "subscale", ifelse(!is.na(stype) & stype == "rational", " (rational \u02B3)", ""), ""),
-                              ifelse(level == "scale",
-                                     "\nclick for item responses", ""))
-                    } else {
-                      sprintf("%s\nscore = %.2f (1\u20134 scale)\n%s level%s%s",
-                              name, mean, level,
-                              ifelse(level == "subscale", ifelse(!is.na(stype) & stype == "rational", " (rational \u02B3)", ""), ""),
-                              ifelse(level == "scale",
-                                     "\nclick for item responses", ""))
-                    }),
-             tip_missing(flag, n_answered, n_total),
-             tip_def(name, defs)),
+           tip = ifelse(level == "header",
+                        paste0(as.character(name),
+                               "\nscale group \u2014 click for detail view"),
+                        paste0(
+                          ifelse(is.na(mean), as.character(name),
+                                 if (tscore) {
+                                   sprintf("%s\nT = %.1f (%s)\n%s level%s%s",
+                                           name, mean, hitop_severity_label(mean), level,
+                                           ifelse(level == "subscale", ifelse(!is.na(stype) & stype == "rational", " (rational \u02B3)", ""), ""),
+                                           ifelse(level == "scale",
+                                                  "\nclick for item responses", ""))
+                                 } else {
+                                   sprintf("%s\nscore = %.2f (1\u20134 scale)\n%s level%s%s",
+                                           name, mean, level,
+                                           ifelse(level == "subscale", ifelse(!is.na(stype) & stype == "rational", " (rational \u02B3)", ""), ""),
+                                           ifelse(level == "scale",
+                                                  "\nclick for item responses", ""))
+                                 }),
+                          tip_missing(flag, n_answered, n_total),
+                          tip_def(name, defs))),
            stype = if ("stype" %in% names(bars)) stype else NA_character_,
            lab = ifelse(!is.na(stype) & stype == "rational",
                         paste0(lab, "\u02B3"), lab),
@@ -680,7 +526,7 @@ plot_hitop_horizontal <- function(bars, defs = NULL,
           fill = fill, data_id = name, tooltip = tip),
       show.legend = FALSE) +
     geom_point_interactive(
-      data = d |> filter(is.na(mean)),
+      data = d |> filter(is.na(mean), level != "header"),
       aes(x = floor_y + span * 0.02, y = ypos,
           data_id = name, tooltip = tip),
       shape = 4, size = 1.5, stroke = 0.7, color = "grey55") +

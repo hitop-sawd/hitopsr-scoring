@@ -421,8 +421,8 @@ ui <- fluidPage(
                                "Hover any bar or label to isolate it; all other bars gray out. ",
                                "Raw scale scores (1\u20134) are listed alphabetically by ",
                                "default. Subscales are italicised and listed under the scale ",
-                               "that they parse in more detail. Click any bar (or open ",
-                               "the next tab) for the detailed group-level view and ",
+                               "that they parse in more detail. Click any bar \u2014 or open ",
+                               "the next tab \u2014 for the detailed group-level view and ",
                                "item responses.")
                        ),
                        div(class = "card",
@@ -671,14 +671,18 @@ server <- function(input, output, session) {
                           spectrum_order = active_order()))
   
   output$circular_plot <- renderGirafe({
-    n <- nrow(bars_display())
+    b <- bars_display()
+    n <- nrow(b) + if (length(unique(b$spectrum)) > 1)
+      length(unique(b$spectrum)) else 0
     hitop_girafe(profile_plot(), w = 9.5, h = max(4, 0.145 * n + 1.5))
   })
   
   output$dl_plot <- downloadHandler(
     filename = function() sprintf("hitop_profile_%s.png", Sys.Date()),
     content = function(file) {
-      n <- nrow(bars_display())
+      b <- bars_display()
+      n <- nrow(b) + if (length(unique(b$spectrum)) > 1)
+        length(unique(b$spectrum)) else 0
       ggsave(file, profile_plot(), width = 10,
              height = max(4, 0.145 * n + 1.5), dpi = 200, bg = "white")
     })
