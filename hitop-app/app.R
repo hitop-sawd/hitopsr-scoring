@@ -421,8 +421,8 @@ ui <- fluidPage(
                                "Hover any bar or label to isolate it; all other bars gray out. ",
                                "Raw scale scores (1\u20134) are listed alphabetically by ",
                                "default. Subscales are italicised and listed under the scale ",
-                               "that they parse in more detail. Click any bar \u2014 or open ",
-                               "the next tab \u2014 for the detailed group-level view and ",
+                               "that they parse in more detail. Click any bar or open ",
+                               "the next tab for the detailed group-level view and ",
                                "item responses.")
                        ),
                        div(class = "card",
