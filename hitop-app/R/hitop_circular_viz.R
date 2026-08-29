@@ -413,7 +413,9 @@ plot_spectrum_detail <- function(bars_t, spectrum_name,
                aes(x = ceil_y, y = ypos), shape = 17, size = 1.4,
                color = "grey15") +
     geom_text_interactive(
-      aes(x = floor_y - span * 0.018, y = ypos, label = lab, fontface = face,
+      aes(x = floor_y - span * 0.018 +
+            ifelse(level == "subscale", span * 0.02, 0),
+          y = ypos, label = lab, fontface = face,
           color = labcol, data_id = name, tooltip = tip),
       hjust = 1, size = base_size * 0.28, show.legend = FALSE) +
     scale_fill_identity() + scale_color_identity() +
@@ -470,7 +472,7 @@ plot_hitop_horizontal <- function(bars, defs = NULL,
     mutate(spectrum = factor(spectrum, levels = spectrum_order),
            lvl_rank = lvl_rank[level],
            sortkey = ifelse(level == "subscale", parent, name)) |>
-    arrange(spectrum, lvl_rank > 1,
+    arrange(spectrum, pmin(lvl_rank, 2),
             subfactor, sortkey, lvl_rank, name) |>
     group_by(spectrum) |> mutate(.i = row_number()) |> ungroup()
   
@@ -572,7 +574,9 @@ plot_hitop_horizontal <- function(bars, defs = NULL,
                aes(x = ceil_y, y = ypos), shape = 17, size = 1.2,
                color = "grey15") +
     geom_text_interactive(
-      aes(x = floor_y - span * 0.015, y = ypos, label = lab,
+      aes(x = floor_y - span * 0.015 +
+            ifelse(level == "subscale", span * 0.02, 0),
+          y = ypos, label = lab,
           fontface = face, color = labcol,
           data_id = name, tooltip = tip),
       hjust = 1, size = base_size * 0.24, show.legend = FALSE) +

@@ -2,6 +2,13 @@ library(shiny)
 library(ggiraph)
 library(shinycustomloader)
 
+# Load the hitop package (Girard): in the browser (webR) install the
+# WebAssembly build from r-universe at startup; on desktop R use a local
+# installation (install once from GitHub using the remotes package).
+# Every stage is wrapped so that no failure here can prevent the app from
+# starting: worst case the app runs with its built-in fallback scoring.
+# Package names are held in variables so the shinylive exporter does not
+# try to bundle them.
 .hitop_pkg <- "hitop"
 .webr_pkg  <- "webr"
 .is_webr   <- isTRUE(grepl("emscripten|wasm",
@@ -283,7 +290,7 @@ ui <- fluidPage(
         "and it will appear immediately.")),
   div(class = "app-header",
       a(class = "gh-link", target = "_blank",
-        href = "https://github.com/hitop-sawd/hitopsr-scoring",
+        href = "https://github.com/YOUR-USERNAME/hitop-shinylive",
         title = "View source on GitHub",
         HTML('<svg viewBox="0 0 16 16" aria-hidden="true"><path d="M8 0C3.58 0 0 3.58 0 8c0 3.54 2.29 6.53 5.47 7.59.4.07.55-.17.55-.38 0-.19-.01-.82-.01-1.49-2.01.37-2.53-.49-2.69-.94-.09-.23-.48-.94-.82-1.13-.28-.15-.68-.52-.01-.53.63-.01 1.08.58 1.23.82.72 1.21 1.87.87 2.33.66.07-.52.28-.87.51-1.07-1.78-.2-3.64-.89-3.64-3.95 0-.87.31-1.59.82-2.15-.08-.2-.36-1.02.08-2.12 0 0 .67-.21 2.2.82.64-.18 1.32-.27 2-.27.68 0 1.36.09 2 .27 1.53-1.04 2.2-.82 2.2-.82.44 1.1.16 1.92.08 2.12.51.56.82 1.27.82 2.15 0 3.07-1.87 3.75-3.65 3.95.29.25.54.73.54 1.48 0 1.07-.01 1.93-.01 2.2 0 .21.15.46.55.38A8.01 8.01 0 0 0 16 8c0-4.42-3.58-8-8-8Z"/></svg>')),
       h2("HiTOP-SR Scoring",
@@ -525,7 +532,12 @@ ui <- fluidPage(
                        div(class = "card",
                            fluidRow(
                              column(5, selectInput("detail_spectrum", "Scale group",
-                                                   choices = hitop_alt_order)),
+                                                   choices = hitop_alt_order),
+                                    checkboxInput("show_err_d",
+                                                  if (hitop_has_intervals)
+                                                    "95% score intervals (Schmukle, 2026)"
+                                                  else "Error bars (\u00B11 SE of item-response mean)",
+                                                  TRUE)),
                              column(7, div(class = "anchor-note", style = "padding-top:26px;",
                                            "Click any bar in the all-scales view to jump here. ",
                                            "Click a scale bar below to see the item responses behind it."))
@@ -798,6 +810,16 @@ server <- function(input, output, session) {
     updateSelectInput(session, "detail_spectrum", selected = sel_spectrum())
     updateTabsetPanel(session, "main_tabs",
                       selected = "3 \u00B7 Spectrum detail")
+  })
+  
+  # keep the two interval checkboxes (tab 2 and tab 3) in lockstep
+  observeEvent(input$show_err, {
+    if (!identical(input$show_err, input$show_err_d))
+      updateCheckboxInput(session, "show_err_d", value = input$show_err)
+  })
+  observeEvent(input$show_err_d, {
+    if (!identical(input$show_err, input$show_err_d))
+      updateCheckboxInput(session, "show_err", value = input$show_err_d)
   })
   
   observeEvent(input$detail_spectrum, {
