@@ -2,6 +2,13 @@ library(shiny)
 library(ggiraph)
 library(shinycustomloader)
 
+# Load the hitop package (Girard): in the browser (webR) install the
+# WebAssembly build from r-universe at startup; on desktop R use a local
+# installation (install once from GitHub using the remotes package).
+# Every stage is wrapped so that no failure here can prevent the app from
+# starting: worst case the app runs with its built-in fallback scoring.
+# Package names are held in variables so the shinylive exporter does not
+# try to bundle them.
 .hitop_pkg <- "hitop"
 .webr_pkg  <- "webr"
 .is_webr   <- isTRUE(grepl("emscripten|wasm",
@@ -323,7 +330,7 @@ ui <- fluidPage(
                              "percentile-based norms are planned to replace them. ",
                              if (hitop_has_intervals) paste0(
                                "Score intervals are 95% regression-based true-score ",
-                               "confidence intervals (Schmukle, 2026), computed by the hitop ",
+                               "confidence intervals (", a("Schmukle, 2026", href = "https://doi.org/10.1177/10731911251362532", target = "_blank"), "), computed by the hitop ",
                                "package from the development sample\u0027s reliability ",
                                "(coefficient alpha), mean, and SD (N = 780). The small diamond ",
                                "on each interval marks the true-score estimate, which is ",
@@ -514,7 +521,7 @@ ui <- fluidPage(
                              conditionalPanel("input.show_err", div(class = "anchor-note",
                                                                     strong("Reading the intervals: "),
                                                                     "the bar shows the observed score. The diamond shows the ",
-                                                                    "estimated true score (Schmukle, 2026), adjusted toward the ",
+                                                                    "estimated true score (", a("Schmukle, 2026", href = "https://doi.org/10.1177/10731911251362532", target = "_blank"), "), adjusted toward the ",
                                                                     "average of the instrument's development sample (about 780 ",
                                                                     "online participants), and can therefore differ from the ",
                                                                     "observed score shown by the bar. The whiskers show the 95% ",
@@ -574,7 +581,7 @@ ui <- fluidPage(
                          conditionalPanel("input.show_err_d", div(class = "anchor-note",
                                                                   strong("Reading the intervals: "),
                                                                   "the bar shows the observed score. The diamond shows the ",
-                                                                  "estimated true score (Schmukle, 2026), adjusted toward the ",
+                                                                  "estimated true score (", a("Schmukle, 2026", href = "https://doi.org/10.1177/10731911251362532", target = "_blank"), "), adjusted toward the ",
                                                                   "average of the instrument's development sample (about 780 ",
                                                                   "online participants), and can therefore differ from the ",
                                                                   "observed score shown by the bar. The whiskers show the 95% ",
