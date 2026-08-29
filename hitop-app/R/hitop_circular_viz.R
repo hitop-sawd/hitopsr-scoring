@@ -332,13 +332,13 @@ plot_spectrum_detail <- function(bars_t, spectrum_name,
       fill  = colorspace::darken(base_col, hitop_level_darken[level]),
       lab   = case_when(level == "spectrum"  ~ toupper(name),
                         level == "subfactor" ~ name,
-                        level == "subscale"  ~ paste0("        ", name),
-                        TRUE ~ paste0("    ", name)),
+                        level == "subscale"  ~ as.character(name),
+                        TRUE ~ as.character(name)),
       face  = case_when(level == "spectrum"  ~ "bold",
                         level == "subfactor" ~ "bold.italic",
                         level == "subscale"  ~ "italic",
                         TRUE ~ "plain"),
-      mean_c = pmin(pmax(mean, anchor), ceil_y),
+      mean_c = pmin(pmax(mean, anchor + span * 0.006), ceil_y),
       lo_c   = pmin(pmax(lo, floor_y), ceil_y),
       hi_c   = pmin(pmax(hi, floor_y), ceil_y),
       capped = mean > ceil_y,
@@ -409,15 +409,19 @@ plot_spectrum_detail <- function(bars_t, spectrum_name,
     geom_errorbarh(aes(xmin = lo_c, xmax = hi_c, y = ypos),
                    height = 0.25, linewidth = 0.3, color = "grey15",
                    na.rm = TRUE) +
+    { if ("est" %in% names(d))
+      geom_point(data = d |> filter(!is.na(est)),
+                 aes(x = pmin(pmax(est, floor_y), ceil_y), y = ypos),
+                 shape = 18, size = 1.6, color = "grey15") } +
     geom_point(data = d |> filter(capped),
                aes(x = ceil_y, y = ypos), shape = 17, size = 1.4,
                color = "grey15") +
     geom_text_interactive(
-      aes(x = floor_y - span * 0.018 +
+      aes(x = floor_y - span * 0.43 +
             ifelse(level == "subscale", span * 0.02, 0),
           y = ypos, label = lab, fontface = face,
           color = labcol, data_id = name, tooltip = tip),
-      hjust = 1, size = base_size * 0.28, show.legend = FALSE) +
+      hjust = 0, size = base_size * 0.28, show.legend = FALSE) +
     scale_fill_identity() + scale_color_identity() +
     scale_x_continuous(limits = c(floor_y - span * 0.44, ceil_y + span * 0.02),
                        breaks = breaks, sec.axis = dup_axis()) +
@@ -488,14 +492,14 @@ plot_hitop_horizontal <- function(bars, defs = NULL,
            lab = case_when(level == "header"    ~ toupper(as.character(name)),
                            level == "spectrum"  ~ as.character(name),
                            level == "subfactor" ~ as.character(name),
-                           level == "subscale"  ~ paste0("        ", name),
-                           TRUE ~ paste0("    ", name)),
+                           level == "subscale"  ~ as.character(name),
+                           TRUE ~ as.character(name)),
            face = case_when(level == "header"    ~ "bold",
                             level == "spectrum"  ~ "bold",
                             level == "subfactor" ~ "bold.italic",
                             level == "subscale"  ~ "italic",
                             TRUE ~ "plain"),
-           mean_c = pmin(pmax(mean, anchor), ceil_y),
+           mean_c = pmin(pmax(mean, anchor + span * 0.006), ceil_y),
            lo_c   = pmin(pmax(lo, floor_y), ceil_y),
            hi_c   = pmin(pmax(hi, floor_y), ceil_y),
            capped = mean > ceil_y,
@@ -570,16 +574,20 @@ plot_hitop_horizontal <- function(bars, defs = NULL,
     geom_errorbarh(aes(xmin = lo_c, xmax = hi_c, y = ypos),
                    height = 0.26, linewidth = 0.28, color = "grey15",
                    na.rm = TRUE) +
+    { if ("est" %in% names(d))
+      geom_point(data = d |> filter(!is.na(est)),
+                 aes(x = pmin(pmax(est, floor_y), ceil_y), y = ypos),
+                 shape = 18, size = 1.1, color = "grey15") } +
     geom_point(data = d |> filter(capped),
                aes(x = ceil_y, y = ypos), shape = 17, size = 1.2,
                color = "grey15") +
     geom_text_interactive(
-      aes(x = floor_y - span * 0.015 +
+      aes(x = floor_y - span * 0.41 +
             ifelse(level == "subscale", span * 0.02, 0),
           y = ypos, label = lab,
           fontface = face, color = labcol,
           data_id = name, tooltip = tip),
-      hjust = 1, size = base_size * 0.24, show.legend = FALSE) +
+      hjust = 0, size = base_size * 0.24, show.legend = FALSE) +
     scale_fill_identity() + scale_color_identity() +
     scale_x_continuous(limits = c(floor_y - span * 0.42, ceil_y + span * 0.02),
                        breaks = breaks, position = "top",
