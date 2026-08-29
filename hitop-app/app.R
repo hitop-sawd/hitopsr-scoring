@@ -3,58 +3,78 @@ library(ggiraph)
 library(shinycustomloader)
 
 # Load the hitop package (Girard): in the browser (webR) install the
-# WebAssembly build from r-universe at startup, following the pattern in
-# jmgirard/hitop-builder; on a desktop R session, use a local installation
-# (install once with remotes::install_github("jmgirard/hitop")).
-# The package name is held in a variable so shinylive does not try to
-# bundle it from the default wasm repo at export time.
+# WebAssembly build from r-universe at startup; on desktop R use a local
+# installation (install once from GitHub using the remotes package).
+# Every stage is wrapped so that no failure here can prevent the app from
+# starting: worst case the app runs with its built-in fallback scoring.
+# Package names are held in variables so the shinylive exporter does not
+# try to bundle them.
 .hitop_pkg <- "hitop"
-if (requireNamespace("webr", quietly = TRUE)) {
-  webr::install(.hitop_pkg,
-                repos = c("https://jmgirard.r-universe.dev",
-                          "https://repo.r-wasm.org"))
-}
-hitop_available <- requireNamespace(.hitop_pkg, quietly = TRUE)
-if (hitop_available) library(.hitop_pkg, character.only = TRUE)
-hitop_pkg_version <- if (hitop_available)
-  as.character(utils::packageVersion(.hitop_pkg)) else NA_character_
+.webr_pkg  <- "webr"
+.is_webr   <- isTRUE(grepl("emscripten|wasm",
+                           paste(R.version$os, R.version$platform)))
+hitop_available    <- FALSE
+hitop_pkg_version  <- NA_character_
+hitop_has_intervals <- FALSE
 
-# Score intervals: use the package's regression-based true-score CIs
-# (interval_hitopsr, Schmukle 2026) when the loaded package provides them;
-# otherwise fall back to the app's own item-SE bars.
-hitop_has_intervals <- hitop_available &&
-  "interval_hitopsr" %in% getNamespaceExports(.hitop_pkg)
+try({
+  if (.is_webr && requireNamespace(.webr_pkg, quietly = TRUE)) {
+    message("hitop loader: installing from r-universe...")
+    do.call(getExportedValue(.webr_pkg, "install"),
+            list(.hitop_pkg,
+                 repos = c("https://jmgirard.r-universe.dev",
+                           "https://repo.r-wasm.org")))
+    message("hitop loader: install call finished")
+  }
+}, silent = TRUE)
+
+try({
+  if (requireNamespace(.hitop_pkg, quietly = TRUE)) {
+    # attachNamespace instead of library(): shinylive's runtime scanner
+    # regex-matches library() calls and tries to install whatever symbol
+    # it captures, producing a spurious warning
+    try(attachNamespace(.hitop_pkg), silent = TRUE)
+    hitop_available   <- TRUE
+    hitop_pkg_version <- as.character(packageVersion(.hitop_pkg))
+  }
+}, silent = TRUE)
+message("hitop loader: package available = ", hitop_available,
+        if (hitop_available) paste0(" (v", hitop_pkg_version, ")") else "")
+
+try({
+  hitop_has_intervals <- hitop_available &&
+    "interval_hitopsr" %in% getNamespaceExports(.hitop_pkg)
+}, silent = TRUE)
 
 if (hitop_has_intervals) {
-  .devstats <- get("hitopsr_devstats", envir = asNamespace(.hitop_pkg))
-  # app display names that differ from the package's Table-1 names
-  .name_alias <- c("NSSI" = "Non-suicidal Self-injury",
-                   "Body Focus" = "Appearance Focus")
-  hitop_camel_of <- function(nm) {
-    nm <- ifelse(nm %in% names(.name_alias), .name_alias[nm], nm)
-    .devstats$camelCase[match(nm, .devstats$scale)]
-  }
-  # Replace lo/hi with the package CI around the true-score estimate, and
-  # keep the estimate for tooltips. Intervals are computed only for fully
-  # answered scales/subscales: the package documents that scores prorated
-  # from partial responses are not comparable to its reference statistics,
-  # and the reference table does not cover the BR spectrum composites.
-  add_score_intervals <- function(bars, level = 0.95) {
-    bars$lo <- bars$hi <- bars$est <- NA_real_
-    cam <- hitop_camel_of(bars$name)
-    ok <- bars$level %in% c("scale", "subscale") & bars$flag == "ok" &
-          !is.na(bars$mean) & !is.na(cam)
-    if (!any(ok)) return(bars)
-    sc <- as.data.frame(as.list(setNames(bars$mean[ok], cam[ok])))
-    res <- suppressWarnings(
-      interval_hitopsr(sc, scores = seq_along(sc), prefix = "",
-                       level = level, append = FALSE))
-    bars$est[ok] <- as.numeric(res[paste0(cam[ok], "_est")])
-    bars$lo[ok]  <- as.numeric(res[paste0(cam[ok], "_lo")])
-    bars$hi[ok]  <- as.numeric(res[paste0(cam[ok], "_hi")])
-    bars
-  }
+  ok <- try({
+    .devstats <- get("hitopsr_devstats", envir = asNamespace(.hitop_pkg))
+    .name_alias <- c("NSSI" = "Non-suicidal Self-injury",
+                     "Body Focus" = "Appearance Focus")
+    hitop_camel_of <- function(nm) {
+      nm <- ifelse(nm %in% names(.name_alias), .name_alias[nm], nm)
+      .devstats$camelCase[match(nm, .devstats$scale)]
+    }
+    add_score_intervals <- function(bars, level = 0.95) {
+      bars$lo <- bars$hi <- bars$est <- NA_real_
+      cam <- hitop_camel_of(bars$name)
+      ok <- bars$level %in% c("scale", "subscale") & bars$flag == "ok" &
+            !is.na(bars$mean) & !is.na(cam)
+      if (!any(ok)) return(bars)
+      sc <- as.data.frame(as.list(setNames(bars$mean[ok], cam[ok])))
+      res <- suppressWarnings(
+        interval_hitopsr(sc, scores = seq_along(sc), prefix = "",
+                         level = level, append = FALSE))
+      bars$est[ok] <- as.numeric(res[paste0(cam[ok], "_est")])
+      bars$lo[ok]  <- as.numeric(res[paste0(cam[ok], "_lo")])
+      bars$hi[ok]  <- as.numeric(res[paste0(cam[ok], "_hi")])
+      bars
+    }
+    TRUE
+  }, silent = TRUE)
+  if (!isTRUE(ok)) hitop_has_intervals <- FALSE
 }
+message("hitop loader: score intervals = ", hitop_has_intervals)
 
 source("R/hitop_circular_viz.R")
 
