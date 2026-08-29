@@ -24,18 +24,18 @@ tip_def <- function(name, defs) {
   d <- defs[name]
   ifelse(is.na(d), "",
          vapply(d, function(x) paste0("\n\n", paste(strwrap(x, 46),
-                collapse = "\n")), character(1)))
+                                                    collapse = "\n")), character(1)))
 }
 
 tip_missing <- function(flag, n_answered, n_total) {
   ifelse(flag == "suppressed",
          sprintf("\nNOT SCORED \u2014 more than 25%% of items missing (%d/%d answered)",
                  n_answered, n_total),
-  ifelse(flag == "prorated",
-         sprintf("\nprorated from %d/%d items \u2014 interpret with caution",
-                 n_answered, n_total),
-  ifelse(flag == "partial",
-         "\nincludes incomplete scales \u2014 interpret with caution", "")))
+         ifelse(flag == "prorated",
+                sprintf("\nprorated from %d/%d items \u2014 interpret with caution",
+                        n_answered, n_total),
+                ifelse(flag == "partial",
+                       "\nincludes incomplete scales \u2014 interpret with caution", "")))
 }
 
 hitop_severity_label <- function(t) {
@@ -95,7 +95,7 @@ build_hitop_levels <- function(scale_scores, hierarchy, prefix = "hsr_") {
       paste(p, collapse = "")
     }, character(1))
   }
-
+  
   hierarchy <- hierarchy |>
     mutate(col = paste0(prefix, to_camel(Scale)),
            Subfactor = ifelse(is.na(Subfactor) | Subfactor == "NA",
@@ -103,13 +103,13 @@ build_hitop_levels <- function(scale_scores, hierarchy, prefix = "hsr_") {
   missing <- setdiff(hierarchy$col, names(scale_scores))
   if (length(missing) > 0)
     stop("Scale columns not found: ", paste(missing, collapse = ", "))
-
+  
   scores <- scale_scores |>
     mutate(.pid = row_number()) |>
     select(.pid, all_of(hierarchy$col)) |>
     pivot_longer(-".pid", names_to = "col", values_to = "score") |>
     left_join(hierarchy, by = "col")
-
+  
   bind_rows(
     scores |>
       summarise(score = mean(score, na.rm = TRUE), .by = c(.pid, Spectrum)) |>
@@ -133,7 +133,7 @@ summarize_hitop <- function(long_scores,
   error <- match.arg(error)
   if (dplyr::n_distinct(long_scores$.pid) < 2 && error != "none")
     error <- "none"
-
+  
   long_scores |>
     summarise(mean = mean(score, na.rm = TRUE),
               sd = sd(score, na.rm = TRUE),
@@ -179,7 +179,7 @@ build_individual_bars <- function(resp, key, hierarchy, br_map = NULL,
   stopifnot(length(resp) == nrow(key))
   r <- as.numeric(resp)
   r[key$reverse] <- 5 - r[key$reverse]
-
+  
   per_scale <- lapply(split(r, key$camel), function(x) {
     n_tot <- length(x); x <- x[!is.na(x)]
     c(mean = if (length(x) / n_tot >= 1 - max_missing) mean(x) else NA,
@@ -191,76 +191,76 @@ build_individual_bars <- function(resp, key, hierarchy, br_map = NULL,
   sc <- merge(hierarchy, sc, by = "camel")
   sc$Subfactor[sc$Subfactor == "NA" | sc$Subfactor == ""] <- NA
   sc$flag <- ifelse(is.na(sc$mean), "suppressed",
-             ifelse(sc$n_answered < sc$n_total, "prorated", "ok"))
-
+                    ifelse(sc$n_answered < sc$n_total, "prorated", "ok"))
+  
   scale_bars <- data.frame(
     level = "scale", name = sc$Scale, spectrum = sc$Spectrum,
     subfactor = sc$Subfactor, mean = sc$mean,
     lo = sc$mean - ci * sc$sem, hi = sc$mean + ci * sc$sem,
     n_answered = sc$n_answered, n_total = sc$n_total, flag = sc$flag
   )
-
+  
   comp <- function(df, level, name, spectrum, subfactor) {
     ok <- !is.na(df$mean)
     m <- if (any(ok)) mean(df$mean[ok]) else NA
     sem <- if (sum(ok) > 1) sd(df$mean[ok]) / sqrt(sum(ok)) else NA
     flag <- if (!any(ok)) "suppressed"
-            else if (any(df$flag != "ok")) "partial" else "ok"
+    else if (any(df$flag != "ok")) "partial" else "ok"
     data.frame(level = level, name = name, spectrum = spectrum,
                subfactor = subfactor, mean = m,
                lo = m - ci * sem, hi = m + ci * sem,
                n_answered = sum(df$n_answered),
                n_total = sum(df$n_total), flag = flag)
   }
-
+  
   subf_bars <- do.call(rbind, lapply(
     split(sc[!is.na(sc$Subfactor), ],
           paste(sc$Spectrum, sc$Subfactor)[!is.na(sc$Subfactor)]),
     function(d) comp(d, "subfactor", d$Subfactor[1], d$Spectrum[1],
                      d$Subfactor[1])))
-
+  
   # Spectrum composites: HiTOP-BR item scoring within the SR responses
   # (Miri's proposal). Each BR spectrum is the mean of its BR items; bars
   # display within the rational family given by br_map$family. Falls back
   # to rational scale-mean spectra if no br_map is supplied.
   if (!is.null(br_map)) {
     spec_bars <- do.call(rbind, lapply(split(br_map, br_map$br_spectrum),
-      function(m) {
-        x <- r[m$item]; n_tot <- length(x); x <- x[!is.na(x)]
-        ok <- length(x) / n_tot >= 1 - max_missing
-        mn <- if (ok) mean(x) else NA
-        sem <- if (length(x) > 1) sd(x) / sqrt(length(x)) else NA
-        data.frame(level = "spectrum", name = m$br_spectrum[1],
-                   spectrum = m$family[1], subfactor = NA_character_,
-                   mean = mn, lo = mn - ci * sem, hi = mn + ci * sem,
-                   n_answered = length(x), n_total = n_tot,
-                   flag = if (!ok) "suppressed"
-                          else if (length(x) < n_tot) "prorated" else "ok")
-      }))
+                                       function(m) {
+                                         x <- r[m$item]; n_tot <- length(x); x <- x[!is.na(x)]
+                                         ok <- length(x) / n_tot >= 1 - max_missing
+                                         mn <- if (ok) mean(x) else NA
+                                         sem <- if (length(x) > 1) sd(x) / sqrt(length(x)) else NA
+                                         data.frame(level = "spectrum", name = m$br_spectrum[1],
+                                                    spectrum = m$family[1], subfactor = NA_character_,
+                                                    mean = mn, lo = mn - ci * sem, hi = mn + ci * sem,
+                                                    n_answered = length(x), n_total = n_tot,
+                                                    flag = if (!ok) "suppressed"
+                                                    else if (length(x) < n_tot) "prorated" else "ok")
+                                       }))
   } else {
     spec_bars <- do.call(rbind, lapply(split(sc, sc$Spectrum), function(d)
       comp(d, "spectrum", d$Spectrum[1], d$Spectrum[1], NA_character_)))
   }
-
+  
   out <- rbind(spec_bars, subf_bars, scale_bars)
-
+  
   # optional rational subscales, nested under their parent scales
   if (!is.null(subscales)) {
     sub_bars <- do.call(rbind, lapply(split(subscales, subscales$subscale),
-      function(m) {
-        x <- r[m$item]; n_tot <- length(x); x <- x[!is.na(x)]
-        ok <- length(x) / n_tot >= 1 - max_missing
-        mn <- if (ok) mean(x) else NA
-        sem <- if (length(x) > 1) sd(x) / sqrt(length(x)) else NA
-        prow <- scale_bars[scale_bars$name == m$parent[1], ]
-        data.frame(level = "subscale", name = m$subscale[1],
-                   spectrum = prow$spectrum[1], subfactor = prow$subfactor[1],
-                   mean = mn, lo = mn - ci * sem, hi = mn + ci * sem,
-                   n_answered = length(x), n_total = n_tot,
-                   flag = if (!ok) "suppressed"
-                          else if (length(x) < n_tot) "prorated" else "ok",
-                   stype = if ("type" %in% names(m)) m$type[1] else "rational")
-      }))
+                                      function(m) {
+                                        x <- r[m$item]; n_tot <- length(x); x <- x[!is.na(x)]
+                                        ok <- length(x) / n_tot >= 1 - max_missing
+                                        mn <- if (ok) mean(x) else NA
+                                        sem <- if (length(x) > 1) sd(x) / sqrt(length(x)) else NA
+                                        prow <- scale_bars[scale_bars$name == m$parent[1], ]
+                                        data.frame(level = "subscale", name = m$subscale[1],
+                                                   spectrum = prow$spectrum[1], subfactor = prow$subfactor[1],
+                                                   mean = mn, lo = mn - ci * sem, hi = mn + ci * sem,
+                                                   n_answered = length(x), n_total = n_tot,
+                                                   flag = if (!ok) "suppressed"
+                                                   else if (length(x) < n_tot) "prorated" else "ok",
+                                                   stype = if ("type" %in% names(m)) m$type[1] else "rational")
+                                      }))
     sub_bars$parent <- vapply(split(subscales, subscales$subscale),
                               function(m) m$parent[1], character(1))
     out$parent <- NA_character_
@@ -309,15 +309,18 @@ plot_spectrum_detail <- function(bars_t, spectrum_name,
                                  spectrum_colors = hitop_spectrum_colors) {
   lvl_rank <- c(spectrum = 1, subfactor = 2, scale = 3, subscale = 4)
   base_col <- spectrum_colors[[spectrum_name]]
-
-  floor_y <- if (tscore) t_floor else score_range[1]
+  
   bt <- bars_t[bars_t$spectrum == spectrum_name, ]
+  anchor  <- if (tscore) t_floor else score_range[1]
+  lo_min  <- suppressWarnings(min(c(bt$lo, bt$mean), na.rm = TRUE))
+  floor_y <- if (tscore) min(t_floor, 5 * floor(lo_min / 5))
+  else min(score_range[1], floor(lo_min * 10) / 10)
   ceil_y  <- if (tscore)
     max(t_ceil, 5 * ceiling(max(c(bt$mean, bt$hi), na.rm = TRUE) / 5))
   else score_range[2]
   span    <- ceil_y - floor_y
   breaks  <- if (tscore) seq(40, ceil_y - 5, 10) else seq(score_range[1], score_range[2], 1)
-
+  
   d <- bars_t |>
     filter(spectrum == spectrum_name) |>
     mutate(lvl_rank = lvl_rank[level],
@@ -335,7 +338,7 @@ plot_spectrum_detail <- function(bars_t, spectrum_name,
                         level == "subfactor" ~ "bold.italic",
                         level == "subscale"  ~ "italic",
                         TRUE ~ "plain"),
-      mean_c = pmin(pmax(mean, floor_y), ceil_y),
+      mean_c = pmin(pmax(mean, anchor), ceil_y),
       lo_c   = pmin(pmax(lo, floor_y), ceil_y),
       hi_c   = pmin(pmax(hi, floor_y), ceil_y),
       capped = mean > ceil_y,
@@ -344,17 +347,17 @@ plot_spectrum_detail <- function(bars_t, spectrum_name,
       n_total = if ("n_total" %in% names(bars_t)) n_total else NA,
       tip = paste0(
         ifelse(is.na(mean), name,
-          if (tscore) {
-            sprintf("%s\nT = %.1f (%s)\n%s level%s%s",
-                    name, mean, hitop_severity_label(mean), level,
-                    ifelse(level == "subscale", ifelse(!is.na(stype) & stype == "rational", " (rational \u02B3)", ""), ""),
-                    ifelse(level == "scale", "\nclick for item responses", ""))
-          } else {
-            sprintf("%s\nscore = %.2f (1\u20134 scale)\n%s level%s%s",
-                    name, mean, level,
-                    ifelse(level == "subscale", ifelse(!is.na(stype) & stype == "rational", " (rational \u02B3)", ""), ""),
-                    ifelse(level == "scale", "\nclick for item responses", ""))
-          }),
+               if (tscore) {
+                 sprintf("%s\nT = %.1f (%s)\n%s level%s%s",
+                         name, mean, hitop_severity_label(mean), level,
+                         ifelse(level == "subscale", ifelse(!is.na(stype) & stype == "rational", " (rational \u02B3)", ""), ""),
+                         ifelse(level == "scale", "\nclick for item responses", ""))
+               } else {
+                 sprintf("%s\nscore = %.2f (1\u20134 scale)\n%s level%s%s",
+                         name, mean, level,
+                         ifelse(level == "subscale", ifelse(!is.na(stype) & stype == "rational", " (rational \u02B3)", ""), ""),
+                         ifelse(level == "scale", "\nclick for item responses", ""))
+               }),
         ifelse(("est" %in% names(bars_t)) & !is.na(est),
                sprintf("\ntrue-score estimate = %.2f", est), ""),
         tip_missing(flag, n_answered, n_total),
@@ -366,9 +369,9 @@ plot_spectrum_detail <- function(bars_t, spectrum_name,
                    paste0(lab, "*"), lab),
       labcol = ifelse(flag == "suppressed", "grey60", fill)
     )
-
+  
   p <- ggplot(d)
-
+  
   if (tscore) {
     bands <- hitop_severity_bands
     bands$lo <- pmax(bands$lo, floor_y); bands$hi <- pmin(bands$hi, ceil_y)
@@ -384,11 +387,11 @@ plot_spectrum_detail <- function(bars_t, spectrum_name,
     p <- p +
       geom_vline(xintercept = breaks, color = "grey88", linewidth = 0.3)
   }
-
+  
   p +
     geom_rect_interactive(
       data = d |> filter(!is.na(mean)),
-      aes(xmin = floor_y, xmax = mean_c,
+      aes(xmin = anchor, xmax = mean_c,
           ymin = ypos - 0.36, ymax = ypos + 0.36,
           fill = fill, data_id = name, tooltip = tip),
       show.legend = FALSE) +
@@ -397,6 +400,9 @@ plot_spectrum_detail <- function(bars_t, spectrum_name,
       aes(x = floor_y + span * 0.027, y = ypos,
           data_id = name, tooltip = tip),
       shape = 4, size = 1.8, stroke = 0.8, color = "grey55") +
+    { if (floor_y < anchor && !tscore)
+      geom_vline(xintercept = anchor, color = "grey60",
+                 linewidth = 0.35, linetype = "22") } +
     geom_errorbarh(aes(xmin = lo_c, xmax = hi_c, y = ypos),
                    height = 0.28, linewidth = 0.9, color = "white",
                    na.rm = TRUE) +
@@ -434,15 +440,18 @@ plot_hitop_horizontal <- function(bars, defs = NULL,
                                   spectrum_colors = hitop_spectrum_colors,
                                   spectrum_order = names(spectrum_colors)) {
   lvl_rank <- c(spectrum = 1, subfactor = 2, scale = 3, subscale = 4)
-  floor_y <- if (tscore) t_floor else score_range[1]
-  # widen the axis so no observed score is clipped (feedback: bars were
-  # exceeding the axis maximum)
+  # bars anchor at the true response floor; the axis may extend below it
+  # so that interval lower bounds are shown rather than truncated
+  anchor  <- if (tscore) t_floor else score_range[1]
+  lo_min  <- suppressWarnings(min(c(bars$lo, bars$mean), na.rm = TRUE))
+  floor_y <- if (tscore) min(t_floor, 5 * floor(lo_min / 5))
+  else min(score_range[1], floor(lo_min * 10) / 10)
   ceil_y  <- if (tscore)
     max(t_ceil, 5 * ceiling(max(c(bars$mean, bars$hi), na.rm = TRUE) / 5))
   else score_range[2]
   span    <- ceil_y - floor_y
   breaks  <- if (tscore) seq(40, ceil_y - 5, 10) else seq(score_range[1], score_range[2], 1)
-
+  
   # group headings whenever more than one group is displayed
   if (length(unique(bars$spectrum)) > 1) {
     hdr <- data.frame(level = "header",
@@ -456,7 +465,7 @@ plot_hitop_horizontal <- function(bars, defs = NULL,
     bars <- rbind(bars, hdr[, names(bars)])
   }
   lvl_rank <- c(header = 0, lvl_rank)
-
+  
   d <- bars |>
     mutate(spectrum = factor(spectrum, levels = spectrum_order),
            lvl_rank = lvl_rank[level],
@@ -464,10 +473,10 @@ plot_hitop_horizontal <- function(bars, defs = NULL,
     arrange(spectrum, lvl_rank > 1,
             subfactor, sortkey, lvl_rank, name) |>
     group_by(spectrum) |> mutate(.i = row_number()) |> ungroup()
-
+  
   sizes <- d |> count(spectrum, name = "n") |>
     mutate(off = cumsum(dplyr::lag(n, default = 0)) +
-                 (dplyr::row_number() - 1) * spectrum_gap)
+             (dplyr::row_number() - 1) * spectrum_gap)
   d <- d |>
     left_join(sizes |> select(spectrum, off), by = "spectrum") |>
     mutate(row = .i + off, ypos = max(row) + 1 - row,
@@ -484,7 +493,7 @@ plot_hitop_horizontal <- function(bars, defs = NULL,
                             level == "subfactor" ~ "bold.italic",
                             level == "subscale"  ~ "italic",
                             TRUE ~ "plain"),
-           mean_c = pmin(pmax(mean, floor_y), ceil_y),
+           mean_c = pmin(pmax(mean, anchor), ceil_y),
            lo_c   = pmin(pmax(lo, floor_y), ceil_y),
            hi_c   = pmin(pmax(hi, floor_y), ceil_y),
            capped = mean > ceil_y,
@@ -492,34 +501,34 @@ plot_hitop_horizontal <- function(bars, defs = NULL,
            n_answered = if ("n_answered" %in% names(bars)) n_answered else NA,
            n_total = if ("n_total" %in% names(bars)) n_total else NA,
            tip = ifelse(level == "header",
-             paste0(as.character(name),
-                    "\nscale group \u2014 click for detail view"),
-             paste0(
-             ifelse(is.na(mean), as.character(name),
-               if (tscore) {
-                 sprintf("%s\nT = %.1f (%s)\n%s level%s%s",
-                         name, mean, hitop_severity_label(mean), level,
-                         ifelse(level == "subscale", ifelse(!is.na(stype) & stype == "rational", " (rational \u02B3)", ""), ""),
-                         ifelse(level == "scale",
-                                "\nclick for item responses", ""))
-               } else {
-                 sprintf("%s\nscore = %.2f (1\u20134 scale)\n%s level%s%s",
-                         name, mean, level,
-                         ifelse(level == "subscale", ifelse(!is.na(stype) & stype == "rational", " (rational \u02B3)", ""), ""),
-                         ifelse(level == "scale",
-                                "\nclick for item responses", ""))
-               }),
-             ifelse(rep("est" %in% names(bars), n()) & !is.na(est),
-                    sprintf("\ntrue-score estimate = %.2f", est), ""),
-             tip_missing(flag, n_answered, n_total),
-             tip_def(name, defs))),
+                        paste0(as.character(name),
+                               "\nscale group \u2014 click for detail view"),
+                        paste0(
+                          ifelse(is.na(mean), as.character(name),
+                                 if (tscore) {
+                                   sprintf("%s\nT = %.1f (%s)\n%s level%s%s",
+                                           name, mean, hitop_severity_label(mean), level,
+                                           ifelse(level == "subscale", ifelse(!is.na(stype) & stype == "rational", " (rational \u02B3)", ""), ""),
+                                           ifelse(level == "scale",
+                                                  "\nclick for item responses", ""))
+                                 } else {
+                                   sprintf("%s\nscore = %.2f (1\u20134 scale)\n%s level%s%s",
+                                           name, mean, level,
+                                           ifelse(level == "subscale", ifelse(!is.na(stype) & stype == "rational", " (rational \u02B3)", ""), ""),
+                                           ifelse(level == "scale",
+                                                  "\nclick for item responses", ""))
+                                 }),
+                          ifelse(rep("est" %in% names(bars), n()) & !is.na(est),
+                                 sprintf("\ntrue-score estimate = %.2f", est), ""),
+                          tip_missing(flag, n_answered, n_total),
+                          tip_def(name, defs))),
            stype = if ("stype" %in% names(bars)) stype else NA_character_,
            lab = ifelse(!is.na(stype) & stype == "rational",
                         paste0(lab, "\u02B3"), lab),
            lab = ifelse(flag == "prorated" | flag == "partial",
                         paste0(lab, "*"), lab),
            labcol = ifelse(flag == "suppressed", "grey60", fill))
-
+  
   ymax <- max(d$ypos) + 0.7
   p <- ggplot(d)
   if (tscore) {
@@ -537,11 +546,11 @@ plot_hitop_horizontal <- function(bars, defs = NULL,
     p <- p + geom_vline(xintercept = breaks, color = "grey88",
                         linewidth = 0.3)
   }
-
+  
   p +
     geom_rect_interactive(
       data = d |> filter(!is.na(mean)),
-      aes(xmin = floor_y, xmax = mean_c,
+      aes(xmin = anchor, xmax = mean_c,
           ymin = ypos - 0.38, ymax = ypos + 0.38,
           fill = fill, data_id = name, tooltip = tip),
       show.legend = FALSE) +
@@ -550,6 +559,9 @@ plot_hitop_horizontal <- function(bars, defs = NULL,
       aes(x = floor_y + span * 0.02, y = ypos,
           data_id = name, tooltip = tip),
       shape = 4, size = 1.5, stroke = 0.7, color = "grey55") +
+    { if (floor_y < anchor && !tscore)
+      geom_vline(xintercept = anchor, color = "grey60",
+                 linewidth = 0.35, linetype = "22") } +
     geom_errorbarh(aes(xmin = lo_c, xmax = hi_c, y = ypos),
                    height = 0.3, linewidth = 0.8, color = "white",
                    na.rm = TRUE) +
