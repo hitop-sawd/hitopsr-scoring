@@ -59,7 +59,7 @@ if (hitop_has_intervals) {
       bars$lo <- bars$hi <- bars$est <- NA_real_
       cam <- hitop_camel_of(bars$name)
       ok <- bars$level %in% c("scale", "subscale") & bars$flag == "ok" &
-            !is.na(bars$mean) & !is.na(cam)
+        !is.na(bars$mean) & !is.na(cam)
       if (!any(ok)) return(bars)
       sc <- as.data.frame(as.list(setNames(bars$mean[ok], cam[ok])))
       res <- suppressWarnings(
@@ -306,319 +306,307 @@ ui <- fluidPage(
   span(id = "oneko-credit",
        a("oneko", href = "https://github.com/adryd325/oneko.js",
          target = "_blank"), " by adryd"),
-
+  
   tabsetPanel(id = "main_tabs",
-
-    tabPanel("About", br(),
-      div(class = "callout-danger",
-        strong("This web app is IN DEVELOPMENT and NOT READY FOR USE. "),
-        "Scores, reference norms, and composite structure are placeholders ",
-        "to demonstrate what the tool could look like. They are NOT ",
-        "endorsed by the HiTOP Society or validated for clinical ",
-        "interpretation."),
-      div(class = "card",
-        h4("Notes for interpretation"),
-        p("Scores are shown as T-scores (mean: 50, SD: 10) relative to ",
-          "preliminary norms pooled from a Prolific community sample collected",
-          "in Phase 2 of HiTOP-SR development by the Measure Development Workgroup (n \u2248 780)",
-          "and a University of Kansas student sample (n = 411). Severity bands (minimal < 60, mild 60\u201365, moderate 65\u201370, ",
-          "severe \u2265 70) are provisional conventions, not validated ",
-          "clinical cutoffs. T-scores use a linear transformation of the ",
-          "raw score; because most scales are strongly floor-constrained, ",
-          "linear T-scores are distorted at the extremes (the minimum ",
-          "possible raw score can exceed T = 40 on many scales), and ",
-          "percentile-based norms are planned to replace them. ",
-          if (hitop_has_intervals) list(
-            "Score intervals are 95% regression-based true-score ",
-            "confidence intervals (", a("Schmukle, 2026", href = "https://doi.org/10.1177/10731911251362532", target = "_blank", .noWS = c("before", "after")), "), computed by the hitop ",
-            "package from the development sample\u0027s reliability ",
-            "(coefficient alpha), mean, and SD (N = 780). The small diamond ",
-            "on each interval marks the true-score estimate, which is ",
-            "pulled toward the reference-group mean and can therefore ",
-            "differ from the observed score shown by the bar. The reference ",
-            "group is the instrument\u0027s development sample, not a ",
-            "community norm. Intervals are omitted for scales scored from ",
-            "incomplete responses and for HiTOP-BR spectrum scores. ",
-            "Interval bounds are not clamped to the response range; on ",
-            "strongly skewed scales a lower bound can fall below the ",
-            "minimum or above the maximum possible score, and the charts ",
-            "extend their axis to show it, with dashed lines marking the ",
-            "response floor and ceiling. The stated coverage applies across respondents drawn from the ",
-            "reference distribution rather than to any one individual.")
-          else paste0(
-            "Error bars show \u00B11 standard error of the person\u0027s ",
-            "own item responses within each scale \u2014 an index of ",
-            "response consistency, not the standard error of measurement; ",
-            "a reliability-based interval is planned to replace it.")),
-        p("When the composites toggle is on, spectrum scores are computed ",
-          "from the HiTOP-BR items embedded within the HiTOP-SR (six BR ",
-          "spectra, with Antagonism and Disinhibition shown within the ",
-          "Externalizing group), while subfactor scores are rational means ",
-          "of their constituent scales. Spectrum T-scores currently ",
-          "reference the student sample only, as item-level community data ",
-          "are not yet available."),
-        h4("Missing data"),
-        p("Scale scores are computed from available items (proration / ",
-          "person-mean imputation) only when at least 75% of a scale's ",
-          "items are answered; otherwise the scale is not scored and is ",
-          "marked \u2715 in the charts. Any scale scored from incomplete ",
-          "items, and any composite built on such scales, is marked * and ",
-          "should be interpreted with caution: research shows prorated ",
-          "scores can be biased even when items are missing completely at ",
-          "random (",
-          a("Mazza et al., 2015",
-            href = "https://doi.org/10.1080/00273171.2015.1068157",
-            target = "_blank", .noWS = c("before", "after")),
-          "; see also ",
-          a("Wu et al., 2022",
-            href = "https://doi.org/10.3758/s13428-021-01671-w",
-            target = "_blank", .noWS = c("before", "after")),
-          ", on proration cutoffs). Whenever possible, complete all ",
-          "items before interpreting the results."),
-        h4("Attributions"),
-        p("The HiTOP-SR was developed by the HiTOP Society ",
-          "(Hierarchical Taxonomy of Psychopathology Society, 2024). ",
-          "The development of this app was aided by functions in the ",
-          a(code("hitop"),
-            href = "https://github.com/jmgirard/hitop",
-            target = "_blank"),
-          " package developed by Jeffrey Girard",
-          if (hitop_available)
-            sprintf(" (version %s, loaded from r-universe)", hitop_pkg_version)
-          else " (not loaded in this session)",
-          ". This web app is currently IN ",
-          "DEVELOPMENT by the HiTOP Software and Development Workgroup ",
-          "and is NOT READY FOR USE."))),
-
-    # ---------------- Data entry ------------------------------------------
-    tabPanel("1 \u00B7 Enter responses", br(),
-      div(class = "card",
-        div(class = "anchor-note",
-            strong("Response scale: "),
-            "1 = Not at all \u2022 2 = A little \u2022 3 = Moderately \u2022 4 = A lot ",
-            "(past 12 months)"),
-        fluidRow(
-          column(6, radioButtons("entry_mode", NULL, inline = TRUE,
-            choices = c("Keyboard grid" = "grid",
-                        "Paste" = "rapid",
-                        "Upload CSV" = "upload"))),
-          column(6, style = "text-align:right;",
-            span(class = "progress-pill", textOutput("progress", inline = TRUE)),
-            actionButton("load_example", "Load random response for demo",
-                         class = "btn btn-default btn-sm",
-                         style = "margin-left:10px;"),
-            actionButton("load_example_missing",
-                         "Load random demo (missing responses)",
-                         class = "btn btn-default btn-sm",
-                         style = "margin-left:6px;"))
-        )
-      ),
-
-      conditionalPanel("input.entry_mode == 'grid'",
-        div(class = "card",
-          div(id = "item_hint",
-              span(class = "hint-num", "Item \u2014"),
-              "Click any cell to begin; the item text appears here."),
-          div(class = "kgrid-help",
-              "Type ", tags$kbd("1"), "\u2013", tags$kbd("4"),
-              " to score and auto-advance \u00B7 ", tags$kbd("x"),
-              " marks an item skipped \u00B7 ", tags$kbd("\u232B"),
-              " clears \u00B7 arrow keys move around"),
-          kgrid_html
-        )
-      ),
-
-      conditionalPanel("input.entry_mode == 'rapid'",
-        div(class = "card",
-          p("Type or paste all responses in item order. Digits 1\u20134; use ",
-            code("x"), " or ", code("NA"), " for a skipped item. Separators ",
-            "(spaces, commas, newlines) are optional."),
-          textAreaInput("rapid_text", NULL, rows = 8, width = "100%",
-                        placeholder = "e.g.  2 1 1 3 4 1 2 ..."),
-          actionButton("apply_rapid", "Apply to responses",
-                       class = "btn btn-default"),
-          span(style = "margin-left:12px;color:#5A6478;",
-               textOutput("rapid_status", inline = TRUE))
-        )
-      ),
-
-      conditionalPanel("input.entry_mode == 'upload'",
-        div(class = "card",
-          p("Upload a one-row CSV with columns ", code("hsr001"), "\u2026",
-            code("hsr405"), " (or simply 405 values in item order)."),
-          fileInput("csv_file", NULL, accept = ".csv")
-        )
-      ),
-
-      div(class = "card", style = "text-align:center;",
-        actionButton("submit_btn", "Submit",
-                     class = "btn btn-primary btn-lg"),
-        actionButton("clear_btn", "Clear all",
-                     class = "btn btn-default btn-lg",
-                     style = "margin-left:10px;"),
-        div(style = "margin-top:8px;", textOutput("submit_msg"))
-      )
-    ),
-
-    # ---------------- Panel 1: circular profile ---------------------------
-    tabPanel("2 \u00B7 All scales", br(),
-      div(class = "card",
-        fluidRow(
-          column(3, style = "padding-top:4px;",
-                 checkboxInput("show_t", "Preliminary T-scores", FALSE),
-                 checkboxInput("show_comp",
-                   "Include HiTOP-BR spectrum scale scores", FALSE)),
-          column(3,
-                 checkboxInput("emp_org",
-                   "Order scales by rational assignment to spectra", FALSE),
-                 checkboxInput("show_subs",
-                   "Include rationally derived subscales", FALSE)),
-          column(2, conditionalPanel("input.show_t",
-                 selectInput("norm_group", "Reference norms (placeholder)",
-                   c("Combined" = "pool",
-                     "Community (Prolific)"   = "pro",
-                     "Students (KU)"          = "ku")))),
-          column(4, style = "text-align:right;padding-top:24px;",
-                 checkboxInput("show_err",
-                   if (hitop_has_intervals)
-                     "95% score intervals (Schmukle, 2026)"
-                   else "Error bars (\u00B11 SE of item-response mean)",
-                   TRUE),
-                 downloadButton("dl_plot", "Download PNG"))
-        ),
-        conditionalPanel("input.show_t",
-          div(class = "callout-warn",
-            strong("Preliminary T-scores: "),
-            "based on placeholder norms that are not population-",
-            "representative and not endorsed by the HiTOP Society, using ",
-            "a linear transformation. Because most scales are ",
-            "floor-constrained, the lowest possible raw score can still ",
-            "correspond to a T-score well above 40 on many scales, and ",
-            "high raw scores can exceed T = 100; percentile-based norms ",
-            "are planned. Not validated for clinical interpretation.")),
-        conditionalPanel("input.show_comp",
-          div(class = "callout-warn",
-            strong("HiTOP-BR spectrum scale scores: "),
-            "spectrum scores use the HiTOP-BR items embedded within the ",
-            "HiTOP-SR. This is not a validated scoring of the ",
-            "higher-order structure, and spectrum T-scores reference the ",
-            "student sample only.")),
-        conditionalPanel("input.emp_org",
-          div(class = "callout-warn",
-            strong("Rational ordering of scales: "),
-            "sorts scales according to the rational scale-to-spectrum ",
-            "assignment from the HiTOP-SR paper (Simms et al., under ",
-            "review).")),
-        conditionalPanel("input.show_subs",
-          div(class = "callout-warn",
-            strong("Rationally derived subscales (marked \u02B3): "),
-            "these were not indicated by data in the scale development ",
-            "process, but were developed when conceptual or practical ",
-            "considerations indicated that subdividing a scale was ",
-            "necessary to preserve important content for clinical ",
-            "applications.")),
-        if (hitop_has_intervals)
-          conditionalPanel("input.show_err", div(class = "anchor-note",
-            strong("Reading the intervals: "),
-            "the bar shows the observed score. The diamond shows the ",
-            "estimated true score (", a("Schmukle, 2026", href = "https://doi.org/10.1177/10731911251362532", target = "_blank", .noWS = c("before", "after")), "), adjusted toward the ",
-            "average of the instrument's development sample (about 780 ",
-            "online participants), and can therefore differ from the ",
-            "observed score shown by the bar. The whiskers show the 95% ",
-            "interval around that estimate. Intervals are not shown for ",
-            "scales with missing responses or for HiTOP-BR spectrum ",
-            "scores. Where an interval reaches past the lowest or highest ",
-            "possible score, the axis widens to show it and a dashed line ",
-            "marks the response-scale boundary.")),
-        div(class = "anchor-note",
-            "Hover any bar or label to isolate it; all other bars gray out. ",
-            "Raw scale scores (1\u20134) are listed alphabetically by ",
-            "default. Subscales are italicised and listed under the scale ",
-            "that they parse in more detail. Click any bar or open the ",
-            "next tab for the detailed group-level view and item ",
-            "responses.")
-      ),
-      div(class = "card",
-        withLoader(girafeOutput("circular_plot", height = "auto"),
-                   type = "image", loader = "hitop_loader.gif"))
-    ),
-
-    # ---------------- Panel 3: spectrum drill-down --------------------------
-    tabPanel("3 \u00B7 Spectrum detail", br(),
-      div(class = "card",
-        fluidRow(
-          column(5, selectInput("detail_spectrum", "Scale group",
-                                choices = hitop_alt_order),
-                 checkboxInput("show_err_d",
-                   if (hitop_has_intervals)
-                     "95% score intervals (Schmukle, 2026)"
-                   else "Error bars (\u00B11 SE of item-response mean)",
-                   TRUE)),
-          column(7, div(class = "anchor-note", style = "padding-top:26px;",
-            "Click any bar in the all-scales view to jump here. ",
-            "Click a scale bar below to see the item responses behind it."))
-        ),
-        conditionalPanel("input.show_t",
-          div(class = "callout-warn",
-            strong("Preliminary T-scores: "),
-            "based on placeholder norms that are not population-",
-            "representative and not endorsed by the HiTOP Society, using ",
-            "a linear transformation. Because most scales are ",
-            "floor-constrained, the lowest possible raw score can still ",
-            "correspond to a T-score well above 40 on many scales, and ",
-            "high raw scores can exceed T = 100; percentile-based norms ",
-            "are planned. Not validated for clinical interpretation.")),
-        conditionalPanel("input.show_comp",
-          div(class = "callout-warn",
-            strong("HiTOP-BR spectrum scale scores: "),
-            "spectrum scores use the HiTOP-BR items embedded within the ",
-            "HiTOP-SR; subfactor scores are rational scale means. Neither ",
-            "approach is a validated scoring of the higher-order ",
-            "structure, and spectrum T-scores reference the student ",
-            "sample only."))
-      ),
-      if (hitop_has_intervals)
-        conditionalPanel("input.show_err_d", div(class = "anchor-note",
-              strong("Reading the intervals: "),
-              "the bar shows the observed score. The diamond shows the ",
-              "estimated true score (", a("Schmukle, 2026", href = "https://doi.org/10.1177/10731911251362532", target = "_blank", .noWS = c("before", "after")), "), adjusted toward the ",
-              "average of the instrument's development sample (about 780 ",
-              "online participants), and can therefore differ from the ",
-              "observed score shown by the bar. The whiskers show the 95% ",
-              "interval around that estimate. Intervals are not shown for ",
-              "scales with missing responses or for HiTOP-BR spectrum ",
-              "scores. Where an interval reaches past the lowest or highest ",
-              "possible score, the axis widens to show it and a dashed line ",
-              "marks the response-scale boundary.")),
-      div(class = "card",
-        withLoader(girafeOutput("detail_plot", height = "auto"),
-                   type = "image", loader = "hitop_loader.gif")),
-      div(class = "card", uiOutput("item_panel"))
-    )
+              
+              tabPanel("About", br(),
+                       div(class = "callout-danger",
+                           strong("This web app is IN DEVELOPMENT and NOT READY FOR USE. "),
+                           "Scores, reference norms, and composite structure are placeholders ",
+                           "to demonstrate what the tool could look like. They are NOT ",
+                           "endorsed by the HiTOP Society or validated for clinical ",
+                           "interpretation."),
+                       div(class = "card",
+                           h4("Notes for interpretation"),
+                           p("Scores are shown as T-scores (mean: 50, SD: 10) relative to ",
+                             "preliminary norms pooled from a Prolific community sample collected",
+                             "in Phase 2 of HiTOP-SR development by the Measure Development Workgroup (n \u2248 780)",
+                             "and a University of Kansas student sample (n = 411). Severity bands (minimal < 60, mild 60\u201365, moderate 65\u201370, ",
+                             "severe \u2265 70) are provisional conventions, not validated ",
+                             "clinical cutoffs. T-scores use a linear transformation of the ",
+                             "raw score; because most scales are strongly floor-constrained, ",
+                             "linear T-scores are distorted at the extremes (the minimum ",
+                             "possible raw score can exceed T = 40 on many scales), and ",
+                             "percentile-based norms are planned to replace them. ",
+                             if (hitop_has_intervals) list(
+                               "Score intervals are 95% regression-based true-score ",
+                               "confidence intervals (", a("Schmukle, 2026", href = "https://doi.org/10.1177/10731911251362532", target = "_blank", .noWS = c("before", "after")), "), computed by the hitop ",
+                               "package from the development sample\u0027s reliability ",
+                               "(coefficient alpha), mean, and SD (N = 780).")
+                             else paste0(
+                               "Error bars show \u00B11 standard error of the person\u0027s ",
+                               "own item responses within each scale \u2014 an index of ",
+                               "response consistency, not the standard error of measurement; ",
+                               "a reliability-based interval is planned to replace it.")),
+                           p("When the composites toggle is on, spectrum scores are computed ",
+                             "from the HiTOP-BR items embedded within the HiTOP-SR (six BR ",
+                             "spectra, with Antagonism and Disinhibition shown within the ",
+                             "Externalizing group), while subfactor scores are rational means ",
+                             "of their constituent scales. Spectrum T-scores currently ",
+                             "reference the student sample only, as item-level community data ",
+                             "are not yet available."),
+                           h4("Missing data"),
+                           p("Scale scores are computed from available items (proration / ",
+                             "person-mean imputation) only when at least 75% of a scale's ",
+                             "items are answered; otherwise the scale is not scored and is ",
+                             "marked \u2715 in the charts. Any scale scored from incomplete ",
+                             "items, and any composite built on such scales, is marked * and ",
+                             "should be interpreted with caution: research shows prorated ",
+                             "scores can be biased even when items are missing completely at ",
+                             "random (",
+                             a("Mazza et al., 2015",
+                               href = "https://doi.org/10.1080/00273171.2015.1068157",
+                               target = "_blank", .noWS = c("before", "after")),
+                             "; see also ",
+                             a("Wu et al., 2022",
+                               href = "https://doi.org/10.3758/s13428-021-01671-w",
+                               target = "_blank", .noWS = c("before", "after")),
+                             ", on proration cutoffs). Whenever possible, complete all ",
+                             "items before interpreting the results."),
+                           h4("Attributions"),
+                           p("The HiTOP-SR was developed by the HiTOP Society ",
+                             "(Hierarchical Taxonomy of Psychopathology Society, 2024). ",
+                             "The development of this app was aided by functions in the ",
+                             a(code("hitop"),
+                               href = "https://github.com/jmgirard/hitop",
+                               target = "_blank"),
+                             " package developed by Jeffrey Girard",
+                             if (hitop_available)
+                               sprintf(" (version %s, loaded from r-universe)", hitop_pkg_version)
+                             else " (not loaded in this session)",
+                             ". This web app is currently IN ",
+                             "DEVELOPMENT by the HiTOP Software and Development Workgroup ",
+                             "and is NOT READY FOR USE."))),
+              
+              # ---------------- Data entry ------------------------------------------
+              tabPanel("1 \u00B7 Enter responses", br(),
+                       div(class = "card",
+                           div(class = "anchor-note",
+                               strong("Response scale: "),
+                               "1 = Not at all \u2022 2 = A little \u2022 3 = Moderately \u2022 4 = A lot ",
+                               "(past 12 months)"),
+                           fluidRow(
+                             column(6, radioButtons("entry_mode", NULL, inline = TRUE,
+                                                    choices = c("Keyboard grid" = "grid",
+                                                                "Paste" = "rapid",
+                                                                "Upload CSV" = "upload"))),
+                             column(6, style = "text-align:right;",
+                                    span(class = "progress-pill", textOutput("progress", inline = TRUE)),
+                                    actionButton("load_example", "Load random response for demo",
+                                                 class = "btn btn-default btn-sm",
+                                                 style = "margin-left:10px;"),
+                                    actionButton("load_example_missing",
+                                                 "Load random demo (missing responses)",
+                                                 class = "btn btn-default btn-sm",
+                                                 style = "margin-left:6px;"))
+                           )
+                       ),
+                       
+                       conditionalPanel("input.entry_mode == 'grid'",
+                                        div(class = "card",
+                                            div(id = "item_hint",
+                                                span(class = "hint-num", "Item \u2014"),
+                                                "Click any cell to begin; the item text appears here."),
+                                            div(class = "kgrid-help",
+                                                "Type ", tags$kbd("1"), "\u2013", tags$kbd("4"),
+                                                " to score and auto-advance \u00B7 ", tags$kbd("x"),
+                                                " marks an item skipped \u00B7 ", tags$kbd("\u232B"),
+                                                " clears \u00B7 arrow keys move around"),
+                                            kgrid_html
+                                        )
+                       ),
+                       
+                       conditionalPanel("input.entry_mode == 'rapid'",
+                                        div(class = "card",
+                                            p("Type or paste all responses in item order. Digits 1\u20134; use ",
+                                              code("x"), " or ", code("NA"), " for a skipped item. Separators ",
+                                              "(spaces, commas, newlines) are optional."),
+                                            textAreaInput("rapid_text", NULL, rows = 8, width = "100%",
+                                                          placeholder = "e.g.  2 1 1 3 4 1 2 ..."),
+                                            actionButton("apply_rapid", "Apply to responses",
+                                                         class = "btn btn-default"),
+                                            span(style = "margin-left:12px;color:#5A6478;",
+                                                 textOutput("rapid_status", inline = TRUE))
+                                        )
+                       ),
+                       
+                       conditionalPanel("input.entry_mode == 'upload'",
+                                        div(class = "card",
+                                            p("Upload a one-row CSV with columns ", code("hsr001"), "\u2026",
+                                              code("hsr405"), " (or simply 405 values in item order)."),
+                                            fileInput("csv_file", NULL, accept = ".csv")
+                                        )
+                       ),
+                       
+                       div(class = "card", style = "text-align:center;",
+                           actionButton("submit_btn", "Submit",
+                                        class = "btn btn-primary btn-lg"),
+                           actionButton("clear_btn", "Clear all",
+                                        class = "btn btn-default btn-lg",
+                                        style = "margin-left:10px;"),
+                           div(style = "margin-top:8px;", textOutput("submit_msg"))
+                       )
+              ),
+              
+              # ---------------- Panel 1: circular profile ---------------------------
+              tabPanel("2 \u00B7 All scales", br(),
+                       div(class = "card",
+                           fluidRow(
+                             column(3, style = "padding-top:4px;",
+                                    checkboxInput("show_t", "Preliminary T-scores", FALSE),
+                                    checkboxInput("show_comp",
+                                                  "Include HiTOP-BR spectrum scale scores", FALSE)),
+                             column(3,
+                                    checkboxInput("emp_org",
+                                                  "Order scales by rational assignment to spectra", FALSE),
+                                    checkboxInput("show_subs",
+                                                  "Include rationally derived subscales", FALSE)),
+                             column(2, conditionalPanel("input.show_t",
+                                                        selectInput("norm_group", "Reference norms (placeholder)",
+                                                                    c("Combined" = "pool",
+                                                                      "Community (Prolific)"   = "pro",
+                                                                      "Students (KU)"          = "ku")))),
+                             column(4, style = "text-align:right;padding-top:24px;",
+                                    checkboxInput("show_err",
+                                                  if (hitop_has_intervals)
+                                                    "95% score intervals (Schmukle, 2026)"
+                                                  else "Error bars (\u00B11 SE of item-response mean)",
+                                                  TRUE),
+                                    downloadButton("dl_plot", "Download PNG"))
+                           ),
+                           conditionalPanel("input.show_t",
+                                            div(class = "callout-warn",
+                                                strong("Preliminary T-scores: "),
+                                                "based on placeholder norms that are not population-",
+                                                "representative and not endorsed by the HiTOP Society, using ",
+                                                "a linear transformation. Because most scales are ",
+                                                "floor-constrained, the lowest possible raw score can still ",
+                                                "correspond to a T-score well above 40 on many scales, and ",
+                                                "high raw scores can exceed T = 100; percentile-based norms ",
+                                                "are planned. Not validated for clinical interpretation.")),
+                           conditionalPanel("input.show_comp",
+                                            div(class = "callout-warn",
+                                                strong("HiTOP-BR spectrum scale scores: "),
+                                                "spectrum scores use the HiTOP-BR items embedded within the ",
+                                                "HiTOP-SR. This is not a validated scoring of the ",
+                                                "higher-order structure, and spectrum T-scores reference the ",
+                                                "student sample only.")),
+                           conditionalPanel("input.emp_org",
+                                            div(class = "callout-warn",
+                                                strong("Rational ordering of scales: "),
+                                                "sorts scales according to the rational scale-to-spectrum ",
+                                                "assignment from the HiTOP-SR paper (Simms et al., under ",
+                                                "review).")),
+                           conditionalPanel("input.show_subs",
+                                            div(class = "callout-warn",
+                                                strong("Rationally derived subscales (marked \u02B3): "),
+                                                "these were not indicated by data in the scale development ",
+                                                "process, but were developed when conceptual or practical ",
+                                                "considerations indicated that subdividing a scale was ",
+                                                "necessary to preserve important content for clinical ",
+                                                "applications.")),
+                           if (hitop_has_intervals)
+                             conditionalPanel("input.show_err", div(class = "anchor-note",
+                                                                    strong("Reading the intervals: "),
+                                                                    "the bar shows the observed score. The diamond shows the ",
+                                                                    "estimated true score (", a("Schmukle, 2026", href = "https://doi.org/10.1177/10731911251362532", target = "_blank", .noWS = c("before", "after")), "), adjusted toward the ",
+                                                                    "average of the instrument's development sample (about 780 ",
+                                                                    "online participants), and can therefore differ from the ",
+                                                                    "observed score shown by the bar. The whiskers show the 95% ",
+                                                                    "interval around that estimate. Intervals are not shown for ",
+                                                                    "scales with missing responses or for HiTOP-BR spectrum ",
+                                                                    "scores. Where an interval reaches past the lowest or highest ",
+                                                                    "possible score, the axis widens to show it and a dashed line ",
+                                                                    "marks the response-scale boundary.")),
+                           div(class = "anchor-note",
+                               "Hover any bar or label to isolate it; all other bars gray out. ",
+                               "Raw scale scores (1\u20134) are listed alphabetically by ",
+                               "default. Subscales are italicised and listed under the scale ",
+                               "that they parse in more detail. Click any bar or open the ",
+                               "next tab for the detailed group-level view and item ",
+                               "responses.")
+                       ),
+                       div(class = "card",
+                           withLoader(girafeOutput("circular_plot", height = "auto"),
+                                      type = "image", loader = "hitop_loader.gif"))
+              ),
+              
+              # ---------------- Panel 3: spectrum drill-down --------------------------
+              tabPanel("3 \u00B7 Spectrum detail", br(),
+                       div(class = "card",
+                           fluidRow(
+                             column(5, selectInput("detail_spectrum", "Scale group",
+                                                   choices = hitop_alt_order),
+                                    checkboxInput("show_err_d",
+                                                  if (hitop_has_intervals)
+                                                    "95% score intervals (Schmukle, 2026)"
+                                                  else "Error bars (\u00B11 SE of item-response mean)",
+                                                  TRUE)),
+                             column(7, div(class = "anchor-note", style = "padding-top:26px;",
+                                           "Click any bar in the all-scales view to jump here. ",
+                                           "Click a scale bar below to see the item responses behind it."))
+                           ),
+                           conditionalPanel("input.show_t",
+                                            div(class = "callout-warn",
+                                                strong("Preliminary T-scores: "),
+                                                "based on placeholder norms that are not population-",
+                                                "representative and not endorsed by the HiTOP Society, using ",
+                                                "a linear transformation. Because most scales are ",
+                                                "floor-constrained, the lowest possible raw score can still ",
+                                                "correspond to a T-score well above 40 on many scales, and ",
+                                                "high raw scores can exceed T = 100; percentile-based norms ",
+                                                "are planned. Not validated for clinical interpretation.")),
+                           conditionalPanel("input.show_comp",
+                                            div(class = "callout-warn",
+                                                strong("HiTOP-BR spectrum scale scores: "),
+                                                "spectrum scores use the HiTOP-BR items embedded within the ",
+                                                "HiTOP-SR; subfactor scores are rational scale means. Neither ",
+                                                "approach is a validated scoring of the higher-order ",
+                                                "structure, and spectrum T-scores reference the student ",
+                                                "sample only."))
+                       ),
+                       if (hitop_has_intervals)
+                         conditionalPanel("input.show_err_d", div(class = "anchor-note",
+                                                                  strong("Reading the intervals: "),
+                                                                  "the bar shows the observed score. The diamond shows the ",
+                                                                  "estimated true score (", a("Schmukle, 2026", href = "https://doi.org/10.1177/10731911251362532", target = "_blank", .noWS = c("before", "after")), "), adjusted toward the ",
+                                                                  "average of the instrument's development sample (about 780 ",
+                                                                  "online participants), and can therefore differ from the ",
+                                                                  "observed score shown by the bar. The whiskers show the 95% ",
+                                                                  "interval around that estimate. Intervals are not shown for ",
+                                                                  "scales with missing responses or for HiTOP-BR spectrum ",
+                                                                  "scores. Where an interval reaches past the lowest or highest ",
+                                                                  "possible score, the axis widens to show it and a dashed line ",
+                                                                  "marks the response-scale boundary.")),
+                       div(class = "card",
+                           withLoader(girafeOutput("detail_plot", height = "auto"),
+                                      type = "image", loader = "hitop_loader.gif")),
+                       div(class = "card", uiOutput("item_panel"))
+              )
   ),
-
+  
   # JS goes last so item texts are available
   tags$script(HTML(kgrid_js)),
   tags$script(src = "oneko.js")
 )
 
 server <- function(input, output, session) {
-
+  
   responses <- reactiveVal(rep(NA_real_, N_ITEMS))
   submitted <- reactiveVal(NULL)        # bar data (raw units)
   submitted_items <- reactiveVal(NULL)  # raw item vector at submit time
   sel_spectrum <- reactiveVal(hitop_alt_order[1])
   sel_scale    <- reactiveVal(NULL)
-
+  
   output$progress <- renderText({
     sprintf("%d / %d entered", sum(!is.na(responses())), N_ITEMS)
   })
-
+  
   sync_grid <- function(r) {
     vals <- ifelse(is.na(r), "", as.character(r))
     session$sendCustomMessage("set_grid", as.list(vals))
   }
-
+  
   # ---- keyboard grid -> R -------------------------------------------------
   observeEvent(input$kgrid_vals, {
     ch <- strsplit(input$kgrid_vals, "")[[1]]
@@ -626,7 +614,7 @@ server <- function(input, output, session) {
     r <- suppressWarnings(as.numeric(ch))   # '.', 'x' -> NA
     responses(r)
   })
-
+  
   # ---- random demo responses ----------------------------------------------
   observeEvent(input$load_example, {
     r <- sample(1:4, N_ITEMS, replace = TRUE)
@@ -634,7 +622,7 @@ server <- function(input, output, session) {
     sync_grid(r)
     showNotification("Random demo responses loaded.", type = "message")
   })
-
+  
   # ---- random demo with missing responses ----------------------------------
   observeEvent(input$load_example_missing, {
     r <- sample(1:4, N_ITEMS, replace = TRUE)
@@ -646,7 +634,7 @@ server <- function(input, output, session) {
       sprintf("Random demo loaded with %d missing responses.", sum(is.na(r))),
       type = "message")
   })
-
+  
   # ---- clear all (with confirmation) ----------------------------------------
   observeEvent(input$clear_btn, {
     if (sum(!is.na(responses())) == 0) {
@@ -669,7 +657,7 @@ server <- function(input, output, session) {
     removeModal()
     showNotification("All responses cleared.", type = "message")
   })
-
+  
   # ---- paste --------------------------------------------------------------
   observeEvent(input$apply_rapid, {
     toks <- regmatches(input$rapid_text,
@@ -685,7 +673,7 @@ server <- function(input, output, session) {
       sprintf("Parsed %d responses (%d missing).",
               length(vals), sum(is.na(vals))))
   })
-
+  
   # ---- csv upload ---------------------------------------------------------
   observeEvent(input$csv_file, {
     df <- try(read.csv(input$csv_file$datapath), silent = TRUE)
@@ -703,7 +691,7 @@ server <- function(input, output, session) {
     showNotification(sprintf("Loaded %d responses from CSV.",
                              sum(!is.na(vals))), type = "message")
   })
-
+  
   # ---- submit -------------------------------------------------------------
   observeEvent(input$submit_btn, {
     r <- responses()
@@ -713,17 +701,17 @@ server <- function(input, output, session) {
     }
     bars <- build_individual_bars(r, item_key, hierarchy, br_map)
     submitted(bars); submitted_items(r)   # default-org bars for the modal
-
+    
     sup <- bars$name[bars$level == "scale" & bars$flag == "suppressed"]
     pro <- bars$name[bars$level == "scale" & bars$flag == "prorated"]
     pct <- 100 * n_miss / N_ITEMS
-
+    
     output$submit_msg <- renderText(
       if (n_miss == 0) "Results calculated with complete data."
       else sprintf(
         "Results calculated with %d missing item(s) (%.1f%%): %d scale(s) prorated*, %d not scored.",
         n_miss, pct, length(pro), length(sup)))
-
+    
     if (pct > 10 || length(sup) > 0) {
       showModal(modalDialog(
         title = "Missing-data warning",
@@ -745,22 +733,22 @@ server <- function(input, output, session) {
     }
     updateTabsetPanel(session, "main_tabs", selected = "2 \u00B7 All scales")
   })
-
+  
   # ---- shared T-scored bars ----------------------------------------------
   norm_cols <- reactive(switch(input$norm_group,
-    pool = c(mean = "mean_pool", sd = "sd_pool"),
-    pro  = c(mean = "mean_pro",  sd = "sd_pool"),
-    ku   = c(mean = "mean_ku",   sd = "sd_pool")))
-
+                               pool = c(mean = "mean_pool", sd = "sd_pool"),
+                               pro  = c(mean = "mean_pro",  sd = "sd_pool"),
+                               ku   = c(mean = "mean_ku",   sd = "sd_pool")))
+  
   active_colors <- reactive({
     pal <- if (isTRUE(input$emp_org)) hitop_alt_colors
-           else c("Scales" = "#2B3445")
+    else c("Scales" = "#2B3445")
     if (isTRUE(input$show_comp))
       pal <- c("HiTOP-BR spectra" = "#1E3A5F", pal)
     pal
   })
   active_order <- reactive(names(active_colors()))
-
+  
   bars_display <- reactive({
     req(submitted_items())
     h <- hierarchy_alt
@@ -770,7 +758,7 @@ server <- function(input, output, session) {
       bm <- br_map; bm$family <- "HiTOP-BR spectra"
     }
     ss <- if (isTRUE(input$show_subs)) subs_all
-          else subs_all[subs_all$type == "empirical", ]
+    else subs_all[subs_all$type == "empirical", ]
     bars <- build_individual_bars(submitted_items(), item_key, h,
                                   br_map = bm, subscales = ss)
     if (!"parent" %in% names(bars)) bars$parent <- NA_character_
@@ -783,14 +771,14 @@ server <- function(input, output, session) {
     if (isTRUE(input$show_t)) bars <- apply_norms(bars, norms, norm_cols())
     bars
   })
-
+  
   # panel 3 bars: always the empirical grouping; subscales on demand
   detail_bars <- reactive({
     req(submitted_items())
     bars <- build_individual_bars(
       submitted_items(), item_key, hierarchy_alt,
       subscales = if (isTRUE(input$show_subs)) subs_all
-                  else subs_all[subs_all$type == "empirical", ])
+      else subs_all[subs_all$type == "empirical", ])
     if (!"parent" %in% names(bars)) bars$parent <- NA_character_
     bars <- bars[bars$level %in% c("scale", "subscale"), ]
     if (hitop_has_intervals) {
@@ -800,30 +788,30 @@ server <- function(input, output, session) {
     if (isTRUE(input$show_t)) bars <- apply_norms(bars, norms, norm_cols())
     bars
   })
-
+  
   profile_plot <- reactive(
     plot_hitop_horizontal(bars_display(), defs = scale_defs,
                           tscore = isTRUE(input$show_t),
                           spectrum_colors = active_colors(),
                           spectrum_order = active_order()))
-
+  
   output$circular_plot <- renderGirafe({
     b <- bars_display()
     n <- nrow(b) + if (length(unique(b$spectrum)) > 1)
-                     length(unique(b$spectrum)) else 0
+      length(unique(b$spectrum)) else 0
     hitop_girafe(profile_plot(), w = 9.5, h = max(4, 0.145 * n + 1.5))
   })
-
+  
   output$dl_plot <- downloadHandler(
     filename = function() sprintf("hitop_profile_%s.png", Sys.Date()),
     content = function(file) {
       b <- bars_display()
       n <- nrow(b) + if (length(unique(b$spectrum)) > 1)
-                       length(unique(b$spectrum)) else 0
+        length(unique(b$spectrum)) else 0
       ggsave(file, profile_plot(), width = 10,
              height = max(4, 0.145 * n + 1.5), dpi = 200, bg = "white")
     })
-
+  
   # ---- click routing: circular profile -> panel 3 --------------------------
   observeEvent(input$circular_plot_selected, {
     nm <- input$circular_plot_selected
@@ -840,7 +828,7 @@ server <- function(input, output, session) {
     updateTabsetPanel(session, "main_tabs",
                       selected = "3 \u00B7 Spectrum detail")
   })
-
+  
   # keep the two interval checkboxes (tab 2 and tab 3) in lockstep
   observeEvent(input$show_err, {
     if (!identical(input$show_err, input$show_err_d))
@@ -850,13 +838,13 @@ server <- function(input, output, session) {
     if (!identical(input$show_err, input$show_err_d))
       updateCheckboxInput(session, "show_err", value = input$show_err_d)
   })
-
+  
   observeEvent(input$detail_spectrum, {
     if (!identical(input$detail_spectrum, sel_spectrum())) {
       sel_spectrum(input$detail_spectrum); sel_scale(NULL)
     }
   })
-
+  
   # ---- panel 3: spectrum detail chart --------------------------------------
   observeEvent(input$detail_plot_selected, {
     nm <- input$detail_plot_selected
@@ -866,7 +854,7 @@ server <- function(input, output, session) {
     else showNotification("Click a scale bar to see its items.",
                           type = "message")
   })
-
+  
   output$detail_plot <- renderGirafe({
     req(detail_bars())
     d <- detail_bars()[detail_bars()$spectrum == sel_spectrum(), ]
@@ -877,7 +865,7 @@ server <- function(input, output, session) {
                                       spectrum_colors = hitop_alt_colors),
                  w = 9.5, h = h)
   })
-
+  
   # ---- panel 3: item responses for a clicked scale --------------------------
   output$item_panel <- renderUI({
     if (is.null(submitted_items()))
@@ -885,20 +873,20 @@ server <- function(input, output, session) {
     if (is.null(sel_scale()))
       return(p(class = "anchor-note",
                "Click a scale bar above to see the item responses."))
-
+    
     sc  <- sel_scale()
     cam <- hierarchy_alt$camel[match(sc, hierarchy_alt$Scale)]
     ki  <- item_key[item_key$camel == cam, ]
     r   <- submitted_items()[ki$item]
     scored <- ifelse(ki$reverse, 5 - r, r)
     ord <- order(-ifelse(is.na(scored), -1, scored), ki$item)
-
+    
     tb <- detail_bars()
     trow <- tb[tb$level == "scale" & tb$name == sc, ]
     score_txt <- if (isTRUE(input$show_t))
       sprintf("T = %.1f (%s)", trow$mean, hitop_severity_label(trow$mean))
     else sprintf("mean score = %.2f", trow$mean)
-
+    
     rows <- lapply(ord, function(j) {
       v <- r[j]
       chip <- if (is.na(v))
@@ -906,15 +894,15 @@ server <- function(input, output, session) {
       else
         span(class = paste0("chip c", v), v)
       div(class = "irow",
-        span(class = "inum", ki$item[j]),
-        span(class = "itext", ki$text[j],
-             if (ki$reverse[j])
-               span(class = "irev",
-                    sprintf(" (reverse-scored; counts as %s)",
-                            ifelse(is.na(v), "\u2014", 5 - v)))),
-        chip)
+          span(class = "inum", ki$item[j]),
+          span(class = "itext", ki$text[j],
+               if (ki$reverse[j])
+                 span(class = "irev",
+                      sprintf(" (reverse-scored; counts as %s)",
+                              ifelse(is.na(v), "\u2014", 5 - v)))),
+          chip)
     })
-
+    
     tagList(
       h4(sprintf("%s \u2014 item responses", sc)),
       div(class = "anchor-note", sprintf(
