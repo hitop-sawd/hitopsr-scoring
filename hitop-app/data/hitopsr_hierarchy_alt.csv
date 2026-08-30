@@ -1,0 +1,77 @@
+Spectrum,Subfactor,Scale,camel
+Somatoform,NA,Bodily Distress,bodilyDistress
+Somatoform,NA,Cognitive Problems,cognitiveProblems
+Somatoform,NA,Conversion Symptoms,conversionSymptoms
+Somatoform,NA,Disease Conviction,diseaseConviction
+Somatoform,NA,Health Anxiety,healthAnxiety
+Somatoform,NA,Somatic Preoccupation,somaticPreoccupation
+Internalizing-Distress,NA,Distress-Dysphoria,distressDysphoria
+Internalizing-Distress,NA,Emotionality,emotionality
+Internalizing-Distress,NA,Hypervigilance,hypervigilance
+Internalizing-Distress,NA,Insomnia,insomnia
+Internalizing-Distress,NA,Nightmares,nightmares
+Internalizing-Distress,NA,Non-suicidal Self-injury,nssi
+Internalizing-Distress,NA,Submissiveness,submissiveness
+Internalizing-Distress,NA,Suicidality,suicidality
+Internalizing-Distress,NA,Trauma Reactions,traumaReactions
+Internalizing-Fear,NA,Agoraphobia,agoraphobia
+Internalizing-Fear,NA,Checking,checking
+Internalizing-Fear,NA,Cleaning,cleaning
+Internalizing-Fear,NA,Counting,counting
+Internalizing-Fear,NA,Panic,panic
+Internalizing-Fear,NA,Social Anxiety,socialAnxiety
+Internalizing-Fear,NA,Specific Phobia Index,specificPhobiaIndex
+Internalizing-Eating/Body Image,NA,Appearance Focus,bodyFocus
+Internalizing-Eating/Body Image,NA,Appetite Loss,appetiteLoss
+Internalizing-Eating/Body Image,NA,Binge Eating,bingeEating
+Internalizing-Eating/Body Image,NA,Body Dissatisfaction,bodyDissatisfaction
+Internalizing-Eating/Body Image,NA,Dietary Restraint,dietaryRestraint
+Internalizing-Eating/Body Image,NA,Excessive Exercise,excessiveExercise
+Internalizing-Eating/Body Image,NA,Food Selectivity,foodSelectivity
+Internalizing-Eating/Body Image,NA,Muscle Building,muscleBuilding
+Internalizing-Eating/Body Image,NA,Purging,purging
+Internalizing-Eating/Body Image,NA,Restricted Eating,restrictedEating
+Internalizing-Sexual Problems,NA,Difficulties Reaching Orgasm,difficultiesReachingOrgasm
+Internalizing-Sexual Problems,NA,Low Sexual Arousal,lowSexualArousal
+Internalizing-Sexual Problems,NA,Low Sexual Interest,lowSexualInterest
+Internalizing-Sexual Problems,NA,Premature Orgasm,prematureOrgasm
+Internalizing-Sexual Problems,NA,Sexual Distress,sexualDistress
+Internalizing-Sexual Problems,NA,Sexual Pain,sexualPain
+Thought Disorder,NA,Dissociation,dissociation
+Thought Disorder,NA,Eccentricity,eccentricity
+Thought Disorder,NA,Fantasy Proneness,fantasyProneness
+Thought Disorder,NA,Reality Distortion,realityDistortion
+Thought Disorder,NA,Manic Energy,manicEnergy
+Detachment,NA,Mistrust,mistrust
+Detachment,NA,Restricted Affectivity,restrictedAffectivity
+Detachment,NA,Romantic Disinterest,romanticDisinterest
+Detachment,NA,Social Aloofness,socialAloofness
+Detachment,NA,Well-being,wellBeing
+Disinhibited Externalizing,NA,Disorganization,disorganization
+Disinhibited Externalizing,NA,Non-persistence,nonPersistence
+Disinhibited Externalizing,NA,Non-planfulness,nonPlanfulness
+Disinhibited Externalizing,NA,Restlessness,restlessness
+Disinhibited Externalizing,NA,Risk Taking,riskTaking
+Overcontrol,NA,Hyperdeliberation,hyperdeliberation
+Overcontrol,NA,Perfectionism,perfectionism
+Overcontrol,NA,Rigidity,rigidity
+Overcontrol,NA,Risk Aversion,riskAversion
+Overcontrol,NA,Workaholism,workaholism
+Antagonistic Externalizing,NA,Callousness,callousness
+Antagonistic Externalizing,NA,Dishonesty,dishonesty
+Antagonistic Externalizing,NA,Domineering,domineering
+Antagonistic Externalizing,NA,Entitlement,entitlement
+Antagonistic Externalizing,NA,Exhibitionism,exhibitionism
+Antagonistic Externalizing,NA,Grandiosity,grandiosity
+Antagonistic Externalizing,NA,Social Aggression,socialAggression
+Antisocial,NA,Antisocial Behavior,antisocialBehavior
+Antisocial,NA,Oppositionality,oppositionality
+Unassigned,NA,Excoriation,excoriation
+Unassigned,NA,Gambling,gambling
+Unassigned,NA,Gaming,gaming
+Unassigned,NA,Hoarding,hoarding
+Unassigned,NA,Paraphilias,paraphilias
+Unassigned,NA,Problematic Shopping,problematicShopping
+Unassigned,NA,Risky Sex,riskySex
+Unassigned,NA,Sex-Related Substance Use,sexRelatedSubstanceUse
+Unassigned,NA,Trichotillomania,trichotillomania
