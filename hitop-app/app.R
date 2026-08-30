@@ -334,10 +334,8 @@ ui <- fluidPage(
                                "package from the development sample\u0027s reliability ",
                                "(coefficient alpha), mean, and SD (N = 780).")
                              else paste0(
-                               "Error bars show \u00B11 standard error of the person\u0027s ",
-                               "own item responses within each scale \u2014 an index of ",
-                               "response consistency, not the standard error of measurement; ",
-                               "a reliability-based interval is planned to replace it.")),
+                               "Score intervals are computed by the hitop package; when the ",
+                               "package cannot be loaded, intervals are not shown.")),
                            p("When the composites toggle is on, spectrum scores are computed ",
                              "from the HiTOP-BR items embedded within the HiTOP-SR (six BR ",
                              "spectra, with Antagonism and Disinhibition shown within the ",
@@ -467,11 +465,15 @@ ui <- fluidPage(
                                                                       "Community (Prolific)"   = "pro",
                                                                       "Students (KU)"          = "ku")))),
                              column(4, style = "text-align:right;padding-top:24px;",
-                                    checkboxInput("show_err",
-                                                  if (hitop_has_intervals)
-                                                    "95% score intervals (Schmukle, 2026)"
-                                                  else "Error bars (\u00B11 SE of item-response mean)",
-                                                  TRUE),
+                                    if (hitop_has_intervals)
+                                      checkboxInput("show_err",
+                                                    "95% score intervals (Schmukle, 2026)", TRUE)
+                                    else em("Score intervals unavailable (r-universe sync ",
+                                            "failed). Please ",
+                                            a("report this on GitHub",
+                                              href = "https://github.com/hitop-sawd/hitopsr-scoring/issues",
+                                              target = "_blank", .noWS = c("before", "after")),
+                                            "."),
                                     downloadButton("dl_plot", "Download PNG"))
                            ),
                            conditionalPanel("input.show_t",
@@ -537,11 +539,15 @@ ui <- fluidPage(
                            fluidRow(
                              column(5, selectInput("detail_spectrum", "Scale group",
                                                    choices = hitop_alt_order),
-                                    checkboxInput("show_err_d",
-                                                  if (hitop_has_intervals)
-                                                    "95% score intervals (Schmukle, 2026)"
-                                                  else "Error bars (\u00B11 SE of item-response mean)",
-                                                  TRUE)),
+                                    if (hitop_has_intervals)
+                                      checkboxInput("show_err_d",
+                                                    "95% score intervals (Schmukle, 2026)", TRUE)
+                                    else em("Score intervals unavailable (r-universe sync ",
+                                            "failed). Please ",
+                                            a("report this on GitHub",
+                                              href = "https://github.com/hitop-sawd/hitopsr-scoring/issues",
+                                              target = "_blank", .noWS = c("before", "after")),
+                                            ".")),
                              column(7, div(class = "anchor-note", style = "padding-top:26px;",
                                            "Click any bar in the all-scales view to jump here. ",
                                            "Click a scale bar below to see the item responses behind it."))
@@ -767,7 +773,7 @@ server <- function(input, output, session) {
     if (hitop_has_intervals) {
       if (isTRUE(input$show_err)) bars <- add_score_intervals(bars)
       else bars$lo <- bars$hi <- bars$est <- NA_real_
-    } else if (!isTRUE(input$show_err)) bars$lo <- bars$hi <- NA_real_
+    } else bars$lo <- bars$hi <- NA_real_
     if (isTRUE(input$show_t)) bars <- apply_norms(bars, norms, norm_cols())
     bars
   })
@@ -784,7 +790,7 @@ server <- function(input, output, session) {
     if (hitop_has_intervals) {
       if (isTRUE(input$show_err)) bars <- add_score_intervals(bars)
       else bars$lo <- bars$hi <- bars$est <- NA_real_
-    } else if (!isTRUE(input$show_err)) bars$lo <- bars$hi <- NA_real_
+    } else bars$lo <- bars$hi <- NA_real_
     if (isTRUE(input$show_t)) bars <- apply_norms(bars, norms, norm_cols())
     bars
   })
