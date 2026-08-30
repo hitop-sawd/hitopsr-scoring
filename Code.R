@@ -19,11 +19,5 @@ shinylive::export(appdir = "hitop-app", destdir = dest)
 
 appdir <- normalizePath(dest)
 print(appdir)
-<<<<<<< Updated upstream
 stopifnot(file.exists(file.path(appdir, "index.html")))
-httpuv::runStaticServer(appdir, port = 8080)
-=======
-file.exists(file.path(appdir, "index.html"))   
-httpuv::runStaticServer(normalizePath("docs/preview"), port = 8087)
-
->>>>>>> Stashed changes
+httpuv::runStaticServer(appdir, port = 8090)
