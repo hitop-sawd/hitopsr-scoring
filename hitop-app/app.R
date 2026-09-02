@@ -49,11 +49,16 @@ try({
 if (hitop_has_intervals) {
   ok <- try({
     .devstats <- get("hitopsr_devstats", envir = asNamespace(.hitop_pkg))
+    # devstats column names have changed across package versions
+    # (scale -> Scale); resolve dynamically and fail safe if absent
+    .sc_col  <- intersect(c("Scale", "scale"), names(.devstats))[1]
+    .cam_col <- intersect(c("camelCase", "camel_case"), names(.devstats))[1]
+    stopifnot(!is.na(.sc_col), !is.na(.cam_col))
     .name_alias <- c("NSSI" = "Non-suicidal Self-injury",
                      "Body Focus" = "Appearance Focus")
     hitop_camel_of <- function(nm) {
       nm <- ifelse(nm %in% names(.name_alias), .name_alias[nm], nm)
-      .devstats$camelCase[match(nm, .devstats$scale)]
+      .devstats[[.cam_col]][match(nm, .devstats[[.sc_col]])]
     }
     add_score_intervals <- function(bars, level = 0.95) {
       bars$lo <- bars$hi <- bars$est <- NA_real_
@@ -290,11 +295,11 @@ ui <- fluidPage(
         "and it will appear immediately.")),
   div(class = "app-header",
       a(class = "gh-link", target = "_blank",
-        href = "https://github.com/YOUR-USERNAME/hitop-shinylive",
+        href = "https://github.com/hitop-sawd/hitopsr-scoring",
         title = "View source on GitHub",
         HTML('<svg viewBox="0 0 16 16" aria-hidden="true"><path d="M8 0C3.58 0 0 3.58 0 8c0 3.54 2.29 6.53 5.47 7.59.4.07.55-.17.55-.38 0-.19-.01-.82-.01-1.49-2.01.37-2.53-.49-2.69-.94-.09-.23-.48-.94-.82-1.13-.28-.15-.68-.52-.01-.53.63-.01 1.08.58 1.23.82.72 1.21 1.87.87 2.33.66.07-.52.28-.87.51-1.07-1.78-.2-3.64-.89-3.64-3.95 0-.87.31-1.59.82-2.15-.08-.2-.36-1.02.08-2.12 0 0 .67-.21 2.2.82.64-.18 1.32-.27 2-.27.68 0 1.36.09 2 .27 1.53-1.04 2.2-.82 2.2-.82.44 1.1.16 1.92.08 2.12.51.56.82 1.27.82 2.15 0 3.07-1.87 3.75-3.65 3.95.29.25.54.73.54 1.48 0 1.07-.01 1.93-.01 2.2 0 .21.15.46.55.38A8.01 8.01 0 0 0 16 8c0-4.42-3.58-8-8-8Z"/></svg>')),
       h2("HiTOP-SR Scoring",
-         span("* v0.3.0-alpha version, feedback is much appreciated",
+         span("* v0.3.1-alpha version, feedback is much appreciated",
               style = paste0("font-size:13px;font-weight:400;color:#AECBE8;",
                              "margin-left:14px;letter-spacing:0;"))),
       div(class = "sub",
